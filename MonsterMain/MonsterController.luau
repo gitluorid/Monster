@@ -39,7 +39,12 @@ local function enterIdle(controller, duration: number)
 	controller.VFX.PlayIdleAnimation(controller)
 
 	local endTime = os.clock() + duration
-	while controller._running and controller.Monster.Parent and controller.Humanoid.Health > 0 and os.clock() < endTime do
+	while
+		controller._running
+		and controller.Monster.Parent
+		and controller.Humanoid.Health > 0
+		and os.clock() < endTime
+	do
 		task.wait(controller.Config.IDLE_TICK_INTERVAL)
 	end
 end
@@ -117,7 +122,7 @@ local function chaseTarget(controller, target: Model)
 	controller.VFX.PlayUniqueAnimation(controller, "Run")
 
 	controller.VFX.PlaySound(controller.OtherSoundsFolder.StartChaseSound, controller.RootPart, 5)
-	
+
 	local targetPlayer = Players:GetPlayerFromCharacter(target)
 	if targetPlayer then
 		chasingEvent:FireClient(targetPlayer)
@@ -156,10 +161,19 @@ local function chaseTarget(controller, target: Model)
 			continue
 		end
 
-		local path = controller.Movement.ComputePath(controller.Config.PATH_SETTINGS, controller.RootPart.Position, targetRoot.Position)
+		local path = controller.Movement.ComputePath(
+			controller.Config.PATH_SETTINGS,
+			controller.RootPart.Position,
+			targetRoot.Position
+		)
 		local nextPosition = targetRoot.Position
 		if path then
-			nextPosition = controller.Movement.PickNextWaypoint(path, controller.RootPart, controller.Config.WAYPOINT_MIN_DISTANCE, targetRoot.Position)
+			nextPosition = controller.Movement.PickNextWaypoint(
+				path,
+				controller.RootPart,
+				controller.Config.WAYPOINT_MIN_DISTANCE,
+				targetRoot.Position
+			)
 		end
 
 		controller.Movement.MoveToPosition(
@@ -240,9 +254,7 @@ function MonsterController.new(monster: Model)
 		VFX = MonsterVFX,
 		OtherSoundsFolder = otherSoundsFolder,
 		WanderSoundsFolder = wanderSoundsFolder,
-		StateMachine = MonsterStateMachine.new(
-			MonsterStateMachine.States.Idle
-		),
+		StateMachine = MonsterStateMachine.new(MonsterStateMachine.States.Idle),
 
 		_running = false,
 		_lastAttackTime = 0,

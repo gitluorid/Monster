@@ -6,6 +6,7 @@ Desktop.ini
 # Editor settings and project metadata
 .vscode/
 .idea/
+selene.toml
 
 # Dependency and cache folders
 node_modules/

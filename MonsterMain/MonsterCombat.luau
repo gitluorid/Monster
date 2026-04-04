@@ -27,8 +27,6 @@ local function spawnBlood(origin: CFrame, amount: number)
 			part.Parent = Workspace
 			part.Color = Color3.fromRGB(120, 0, 0)
 			part.Material = Enum.Material.Limestone
-			
-			
 
 			local velocity = Instance.new("BodyVelocity")
 			velocity.Velocity = Vector3.new(math.random(-10, 10), math.random(10, 10), math.random(-10, 10))
@@ -76,7 +74,7 @@ function MonsterCombat.PerformSwingAttack(
 
 	-- Visual/audio startup for the attack.
 	local _attackTrack = vfx.PlayUniqueAnimation(vfxContext, "Attack")
-	
+
 	local attackSound = otherSoundsFolder:FindFirstChild("Attack")
 	if attackSound and attackSound:IsA("Sound") then
 		vfx.PlaySound(attackSound, monsterRoot, 4)
@@ -96,7 +94,7 @@ function MonsterCombat.PerformSwingAttack(
 		targetModel:PivotTo(leftHand.CFrame * CFrame.new(0, -2.5, -0.8))
 		targetRoot.AssemblyLinearVelocity = Vector3.zero
 		targetRoot.AssemblyAngularVelocity = Vector3.zero
-		
+
 		local createdWeld = Instance.new("WeldConstraint")
 		createdWeld.Part0 = leftHand
 		createdWeld.Part1 = targetRoot.Parent["Head"]
@@ -104,7 +102,7 @@ function MonsterCombat.PerformSwingAttack(
 		createdWeld.Parent = leftHand
 		holdWeld = createdWeld
 	end
-	
+
 	if hitDelay > 0 then
 		task.wait(hitDelay)
 	end
@@ -126,17 +124,17 @@ function MonsterCombat.PerformSwingAttack(
 		bloodOrigin = targetHead.CFrame
 		targetHead:Destroy()
 	end
-	
+
 	spawnBlood(bloodOrigin, config.BLOOD_PART_AMOUNT)
-	
+
 	local vfx = replicatedStorage.Monster.Vfx.NeckBlood
-	
+
 	if holdWeld and holdWeld.Parent then
 		holdWeld:Destroy()
 	end
-	
+
 	task.wait(0.01)
-	
+
 	local leftForce = -monsterRoot.CFrame.RightVector * 100 -- Multiply by force amount
 	local bv = Instance.new("BodyVelocity")
 	bv.Velocity = leftForce

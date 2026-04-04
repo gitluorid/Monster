@@ -46,7 +46,11 @@ function MonsterMovement.GetClosestTarget(monster: Model, monsterRoot: BasePart,
 end
 
 -- Computes a path from startPosition to endPosition using Roblox pathfinding.
-function MonsterMovement.ComputePath(pathSettings: {[string]: any}, startPosition: Vector3, endPosition: Vector3): Path?
+function MonsterMovement.ComputePath(
+	pathSettings: { [string]: any },
+	startPosition: Vector3,
+	endPosition: Vector3
+): Path?
 	local path = PathfindingService:CreatePath(pathSettings)
 	local success = pcall(function()
 		path:ComputeAsync(startPosition, endPosition)
@@ -93,7 +97,12 @@ function MonsterMovement.MoveToPosition(
 end
 
 -- For chase movement: pick the first waypoint that is meaningfully ahead.
-function MonsterMovement.PickNextWaypoint(path: Path, monsterRoot: BasePart, minimumDistance: number, fallbackPosition: Vector3): Vector3
+function MonsterMovement.PickNextWaypoint(
+	path: Path,
+	monsterRoot: BasePart,
+	minimumDistance: number,
+	fallbackPosition: Vector3
+): Vector3
 	local nextPosition = fallbackPosition
 
 	for index, waypoint in ipairs(path:GetWaypoints()) do
@@ -143,11 +152,8 @@ function MonsterMovement.GetRandomWanderGoal(
 	local attempts = math.max(1, maxAttempts or 8)
 
 	for _ = 1, attempts do
-		local randomOffset = Vector3.new(
-			math.random(-wanderRadius, wanderRadius),
-			0,
-			math.random(-wanderRadius, wanderRadius)
-		)
+		local randomOffset =
+			Vector3.new(math.random(-wanderRadius, wanderRadius), 0, math.random(-wanderRadius, wanderRadius))
 
 		if randomOffset.Magnitude >= minDistance then
 			return monsterRoot.Position + randomOffset
@@ -156,11 +162,8 @@ function MonsterMovement.GetRandomWanderGoal(
 
 	local fallbackAngle = math.random() * math.pi * 2
 	local fallbackDistance = math.max(minDistance, wanderRadius * 0.65)
-	local fallbackOffset = Vector3.new(
-		math.cos(fallbackAngle) * fallbackDistance,
-		0,
-		math.sin(fallbackAngle) * fallbackDistance
-	)
+	local fallbackOffset =
+		Vector3.new(math.cos(fallbackAngle) * fallbackDistance, 0, math.sin(fallbackAngle) * fallbackDistance)
 
 	return monsterRoot.Position + fallbackOffset
 end

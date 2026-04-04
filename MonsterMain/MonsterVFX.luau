@@ -66,7 +66,11 @@ function MonsterVFX.PlayUniqueAnimation(controller, animationName: string): Anim
 		return nil
 	end
 
-	if controller._vfxCurrentAnimationTrack and controller._vfxCurrentAnimationTrack.IsPlaying and controller._vfxCurrentAnimationName == animation.Name then
+	if
+		controller._vfxCurrentAnimationTrack
+		and controller._vfxCurrentAnimationTrack.IsPlaying
+		and controller._vfxCurrentAnimationName == animation.Name
+	then
 		return controller._vfxCurrentAnimationTrack
 	end
 
@@ -119,12 +123,17 @@ function MonsterVFX.TryPlayFootstep(controller, reason: string?): boolean
 		horizontalSpeed = Vector3.new(rootPart.AssemblyLinearVelocity.X, 0, rootPart.AssemblyLinearVelocity.Z).Magnitude
 	end
 
-	if moveMagnitude <= controller.Config.FOOTSTEP_MOVE_THRESHOLD and horizontalSpeed <= controller.Config.FOOTSTEP_MOVE_THRESHOLD then
+	if
+		moveMagnitude <= controller.Config.FOOTSTEP_MOVE_THRESHOLD
+		and horizontalSpeed <= controller.Config.FOOTSTEP_MOVE_THRESHOLD
+	then
 		return false
 	end
 
 	local footstepSound = controller.OtherSoundsFolder:FindFirstChild("WanderFootstep")
-	local soundParent = controller.Monster.PrimaryPart or controller.Monster:FindFirstChild("HumanoidRootPart") or controller.Monster:FindFirstChildWhichIsA("BasePart")
+	local soundParent = controller.Monster.PrimaryPart
+		or controller.Monster:FindFirstChild("HumanoidRootPart")
+		or controller.Monster:FindFirstChildWhichIsA("BasePart")
 
 	if not footstepSound or not footstepSound:IsA("Sound") then
 		return false

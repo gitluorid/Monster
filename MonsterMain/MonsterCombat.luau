@@ -48,7 +48,6 @@ function MonsterCombat.PerformSwingAttack(
 	monsterRoot: BasePart,
 	vfx,
 	vfxContext,
-	utils,
 	otherSoundsFolder: Instance,
 	config,
 	lastAttackTime: number
@@ -80,7 +79,7 @@ function MonsterCombat.PerformSwingAttack(
 	
 	local attackSound = otherSoundsFolder:FindFirstChild("Attack")
 	if attackSound and attackSound:IsA("Sound") then
-		utils.PlaySound(attackSound, monsterRoot, 4)
+		vfx.PlaySound(attackSound, monsterRoot, 4)
 	end
 
 	-- Wait for swing windup so the hit lands after the animation starts.
@@ -117,7 +116,7 @@ function MonsterCombat.PerformSwingAttack(
 
 	local headBlowSound = otherSoundsFolder:FindFirstChild("HeadBlow")
 	if headBlowSound and headBlowSound:IsA("Sound") then
-		utils.PlaySound(headBlowSound, monsterRoot, 3)
+		vfx.PlaySound(headBlowSound, monsterRoot, 3)
 	end
 
 	-- Pick blood spawn origin (head preferred, root fallback).

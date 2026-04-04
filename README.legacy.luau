@@ -24,7 +24,7 @@ STARTUP FLOW (FROM SERVER SCRIPT TO AI LOOP)
 2) MonsterMain/MonsterController.luau
    - Function: MonsterController.new(monster)
    - Validates monster rig (Humanoid + HumanoidRootPart)
-   - Loads submodules: config, movement, combat, VFX, state machine, utility
+   - Loads submodules: config, movement, combat, VFX, state machine
    - Creates one controller table that stores runtime state
    - Stores VFX runtime fields on controller and creates StateMachine object
 
@@ -154,7 +154,7 @@ stop(controller)
 - Stops VFX subsystem and active animation
 
 MonsterVFX.<helper functions>
-- Stateless helper functions that read/write VFX runtime fields on controller
+- Includes shared audio/animation helpers used by VFX, controller, and combat
 
 === MonsterCombat.luau ===
 
@@ -180,17 +180,6 @@ MonsterStateMachine.new(initialState)
   - GetState()
   - SetState(nextState)
   - TimeInState()
-
-=== Utility.luau ===
-
-Utility.PlaySound(soundTemplate, parent, cleanUpTime)
-- Clones and plays a sound safely
-
-Utility.PlayAnimation(animationTemplate, model)
-- Loads animation on Animator and plays it
-
-Utility.StopAnimation(animationTrack)
-- Stops an animation track if present
 
 ---------------------------------------------------------------------
 CONFIG-DRIVEN BEHAVIOR

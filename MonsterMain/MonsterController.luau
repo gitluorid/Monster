@@ -11,24 +11,17 @@ if not parentFolder then
 	error("MonsterController must be parented before requires")
 end
 
-local rootFolder = parentFolder.Parent
-if not rootFolder then
-	error("MonsterController requires a parent folder")
-end
-
 local configModule = parentFolder:WaitForChild("MonsterConfig") :: ModuleScript
 local movementModule = parentFolder:WaitForChild("MonsterMovement") :: ModuleScript
 local combatModule = parentFolder:WaitForChild("MonsterCombat") :: ModuleScript
 local vfxModule = parentFolder:WaitForChild("MonsterVFX") :: ModuleScript
 local stateMachineModule = parentFolder:WaitForChild("MonsterStateMachine") :: ModuleScript
-local utilityModule = rootFolder:WaitForChild("Utility") :: ModuleScript
 
 local Config = require(configModule)
 local Movement = require(movementModule)
 local Combat = require(combatModule)
 local MonsterVFX = require(vfxModule)
 local MonsterStateMachine = require(stateMachineModule)
-local Utility = require(utilityModule)
 
 local MonsterController = {}
 
@@ -122,8 +115,8 @@ local function chaseTarget(controller, target: Model)
 	controller.VFX.SetFootstepInterval(controller, controller.Config.CHASE_FOOTSTEP_INTERVAL)
 	controller.Humanoid.WalkSpeed = controller.Config.CHASE_WALK_SPEED
 	controller.VFX.PlayUniqueAnimation(controller, "Run")
-	
-	Utility.PlaySound(controller.OtherSoundsFolder.StartChaseSound, controller.RootPart, 5)
+
+	controller.VFX.PlaySound(controller.OtherSoundsFolder.StartChaseSound, controller.RootPart, 5)
 	
 	local targetPlayer = Players:GetPlayerFromCharacter(target)
 	if targetPlayer then
@@ -153,7 +146,6 @@ local function chaseTarget(controller, target: Model)
 				controller.RootPart,
 				controller.VFX,
 				controller,
-				controller.Utility,
 				controller.OtherSoundsFolder,
 				controller.Config,
 				controller._lastAttackTime
@@ -243,7 +235,6 @@ function MonsterController.new(monster: Model)
 		RootPart = rootPart,
 		AnimationsFolder = animationsFolder,
 		Config = Config,
-		Utility = Utility,
 		Movement = Movement,
 		Combat = Combat,
 		VFX = MonsterVFX,

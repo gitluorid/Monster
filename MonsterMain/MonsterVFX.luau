@@ -1,4 +1,58 @@
+local Debris = game:GetService("Debris")
+
 local MonsterVFX = {}
+
+local DEFAULT_SOUND_CLEANUP = 5
+
+function MonsterVFX.PlaySound(soundTemplate: Sound, parent: Instance, cleanUpTime: number?): Sound?
+	if not soundTemplate or not parent then
+		return nil
+	end
+
+	local soundClone = soundTemplate:Clone()
+	soundClone.Parent = parent
+	soundClone:Play()
+
+	Debris:AddItem(soundClone, cleanUpTime or DEFAULT_SOUND_CLEANUP)
+	return soundClone
+end
+
+local function playAnimation(animationTemplate: Animation, model: Model): AnimationTrack?
+	if not animationTemplate or not model then
+		return nil
+	end
+
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if not humanoid then
+		return nil
+	end
+
+	local animator = humanoid:FindFirstChildOfClass("Animator")
+	if not animator then
+		animator = Instance.new("Animator")
+		animator.Parent = humanoid
+	end
+
+	local animationClone = animationTemplate:Clone()
+	animationClone.Parent = model
+
+	local animationTrack = animator:LoadAnimation(animationClone)
+	animationTrack:Play()
+
+	animationTrack.Stopped:Connect(function()
+		if animationClone.Parent then
+			animationClone:Destroy()
+		end
+	end)
+
+	return animationTrack
+end
+
+local function stopAnimation(animationTrack: AnimationTrack?)
+	if animationTrack then
+		animationTrack:Stop()
+	end
+end
 
 -- Updates how often footsteps are allowed to play.
 function MonsterVFX.SetFootstepInterval(controller, interval: number)
@@ -17,12 +71,12 @@ function MonsterVFX.PlayUniqueAnimation(controller, animationName: string): Anim
 	end
 
 	if controller._vfxCurrentAnimationTrack then
-		controller.Utility.StopAnimation(controller._vfxCurrentAnimationTrack)
+		stopAnimation(controller._vfxCurrentAnimationTrack)
 		controller._vfxCurrentAnimationTrack = nil
 		controller._vfxCurrentAnimationName = nil
 	end
 
-	controller._vfxCurrentAnimationTrack = controller.Utility.PlayAnimation(animation, controller.Monster)
+	controller._vfxCurrentAnimationTrack = playAnimation(animation, controller.Monster)
 	controller._vfxCurrentAnimationName = animation.Name
 
 	return controller._vfxCurrentAnimationTrack
@@ -38,7 +92,7 @@ function MonsterVFX.PlayIdleAnimation(controller): AnimationTrack?
 
 	-- If there is no idle animation asset, stop motion animation so the monster visually idles.
 	if controller._vfxCurrentAnimationTrack then
-		controller.Utility.StopAnimation(controller._vfxCurrentAnimationTrack)
+		stopAnimation(controller._vfxCurrentAnimationTrack)
 		controller._vfxCurrentAnimationTrack = nil
 		controller._vfxCurrentAnimationName = nil
 	end
@@ -80,7 +134,7 @@ function MonsterVFX.TryPlayFootstep(controller, reason: string?): boolean
 		return false
 	end
 
-	controller.Utility.PlaySound(footstepSound, soundParent, 1)
+	MonsterVFX.PlaySound(footstepSound, soundParent, 1)
 	controller._vfxLastFootstepAt = now
 	return true
 end
@@ -97,7 +151,7 @@ local function startWanderSoundLoop(controller)
 			if #availableSounds > 0 then
 				local randomSound = availableSounds[math.random(1, #availableSounds)]
 				if randomSound:IsA("Sound") then
-					controller.Utility.PlaySound(randomSound, controller.Monster)
+					MonsterVFX.PlaySound(randomSound, controller.Monster)
 					task.wait(randomSound.TimeLength + 0.1)
 				end
 			end
@@ -125,7 +179,7 @@ function MonsterVFX.Stop(controller)
 	controller._vfxRunning = false
 
 	if controller._vfxCurrentAnimationTrack then
-		controller.Utility.StopAnimation(controller._vfxCurrentAnimationTrack)
+		stopAnimation(controller._vfxCurrentAnimationTrack)
 		controller._vfxCurrentAnimationTrack = nil
 		controller._vfxCurrentAnimationName = nil
 	end

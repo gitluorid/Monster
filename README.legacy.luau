@@ -192,9 +192,6 @@ Utility.PlayAnimation(animationTemplate, model)
 Utility.StopAnimation(animationTrack)
 - Stops an animation track if present
 
-Utility.CreateHitbox(parent, size, cframe, damage)
-- Creates short-lived hitbox part that damages touched humanoids once each
-
 ---------------------------------------------------------------------
 CONFIG-DRIVEN BEHAVIOR
 ---------------------------------------------------------------------

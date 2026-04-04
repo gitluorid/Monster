@@ -15,13 +15,13 @@ STARTUP FLOW (FROM SERVER SCRIPT TO AI LOOP)
 ---------------------------------------------------------------------
 
 1) init.legacy.luau (top-level script)
-   - Requires MonsterMain package + MonsterMain/MonsterConfig
+   - Requires MonsterAI package + MonsterAI/Config
    - Waits for workspace.Monster model:
        local monster = workspace:WaitForChild("Monster")
-   - Calls MonsterMain.StartController(monster, false)
+   - Calls MonsterAI.StartController(monster, false)
    - Uses pcall for safe error reporting.
 
-2) MonsterMain/MonsterController.luau
+2) MonsterAI/Controller.luau
    - Function: MonsterController.new(monster)
    - Validates monster rig (Humanoid + HumanoidRootPart)
    - Loads submodules: config, movement, combat, VFX, state machine
@@ -48,7 +48,7 @@ Loop behavior:
 FUNCTION-BY-FUNCTION FLOW GUIDE
 ---------------------------------------------------------------------
 
-=== MonsterController.luau ===
+=== Controller.luau ===
 
 setState(controller, nextState)
 - Calls state machine SetState.
@@ -97,7 +97,7 @@ stop(controller)
 MonsterController.new(monster)
 - Constructor/factory for the controller table
 
-=== MonsterMovement.luau ===
+=== Movement.luau ===
 
 GetHumanoidAndRoot(model)
 - Returns Humanoid and HumanoidRootPart if present
@@ -127,7 +127,7 @@ GetRandomWanderGoal(monsterRoot, wanderRadius, minimumDistance, maxAttempts)
 - Randomly picks offset goal around monster
 - Enforces minimum distance when possible
 
-=== MonsterVFX.luau ===
+=== VFX.luau ===
 
 setFootstepInterval(controller, interval)
 - Changes minimum time between footsteps
@@ -156,7 +156,7 @@ stop(controller)
 MonsterVFX.<helper functions>
 - Includes shared audio/animation helpers used by VFX, controller, and combat
 
-=== MonsterCombat.luau ===
+=== Combat.luau ===
 
 getHumanoidAndRoot(model)
 - Internal helper to read target rig parts safely
@@ -173,7 +173,7 @@ MonsterCombat.PerformSwingAttack(...)
 - Spawn blood
 - Return (didAttack, attackTime)
 
-=== MonsterStateMachine.luau ===
+=== StateMachine.luau ===
 
 MonsterStateMachine.new(initialState)
 - Creates lightweight state machine object with:
@@ -185,7 +185,7 @@ MonsterStateMachine.new(initialState)
 CONFIG-DRIVEN BEHAVIOR
 ---------------------------------------------------------------------
 
-Most gameplay behavior is controlled by MonsterMain/MonsterConfig.luau.
+Most gameplay behavior is controlled by MonsterAI/Config.luau.
 
 Key sections:
 - Combat/Targeting: detection range, melee range, cooldown
@@ -201,7 +201,7 @@ TROUBLESHOOTING CHECKLIST
 If monster does not move:
 1. Confirm monster has Humanoid and HumanoidRootPart
 2. Confirm pathfinding area is walkable
-3. Confirm startup script calls MonsterMain.StartController(monster, false)
+3. Confirm startup script calls MonsterAI.StartController(monster, false)
 
 If monster does not animate:
 1. Check ReplicatedStorage.Monster.Animations contains Walk/Run/Attack
@@ -209,7 +209,7 @@ If monster does not animate:
 
 If attack looks wrong:
 1. Confirm target has Humanoid + HumanoidRootPart
-2. Confirm sounds exist under MonsterMain/OtherSounds
+2. Confirm sounds exist under MonsterAI/OtherSounds
 
 ---------------------------------------------------------------------
 END NOTE

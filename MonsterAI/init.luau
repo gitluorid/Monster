@@ -2,7 +2,7 @@ local Monster = {}
 
 -- This module is the entry point for the AI package.
 -- It only creates the controller and starts it.
-local controllerModule = script:WaitForChild("MonsterController") :: ModuleScript
+local controllerModule = script:WaitForChild("Controller") :: ModuleScript
 local MonsterController = require(controllerModule)
 
 -- Creates and starts one controller instance.

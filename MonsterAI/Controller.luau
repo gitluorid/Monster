@@ -11,11 +11,11 @@ if not parentFolder then
 	error("MonsterController must be parented before requires")
 end
 
-local configModule = parentFolder:WaitForChild("MonsterConfig") :: ModuleScript
-local movementModule = parentFolder:WaitForChild("MonsterMovement") :: ModuleScript
-local combatModule = parentFolder:WaitForChild("MonsterCombat") :: ModuleScript
-local vfxModule = parentFolder:WaitForChild("MonsterVFX") :: ModuleScript
-local stateMachineModule = parentFolder:WaitForChild("MonsterStateMachine") :: ModuleScript
+local configModule = parentFolder:WaitForChild("Config") :: ModuleScript
+local movementModule = parentFolder:WaitForChild("Movement") :: ModuleScript
+local combatModule = parentFolder:WaitForChild("Combat") :: ModuleScript
+local vfxModule = parentFolder:WaitForChild("VFX") :: ModuleScript
+local stateMachineModule = parentFolder:WaitForChild("StateMachine") :: ModuleScript
 
 local Config = require(configModule)
 local Movement = require(movementModule)

@@ -1,0 +1,15 @@
+# OS-generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor settings and project metadata
+.vscode/
+.idea/
+
+# Dependency and cache folders
+node_modules/
+
+# Logs and temp files
+*.log
+*.tmp

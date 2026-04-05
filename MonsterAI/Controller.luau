@@ -1,9 +1,6 @@
 local MonsterController = {}
 
 local parentFolder = script.Parent
-if not parentFolder then
-	error("MonsterController must be parented before requires")
-end
 
 local logicFolder = parentFolder:WaitForChild("logic")
 local fxFolder = parentFolder:WaitForChild("fx")

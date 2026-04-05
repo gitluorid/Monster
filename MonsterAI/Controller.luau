@@ -13,7 +13,18 @@ local MonsterStateMachine = require(logicFolder:WaitForChild("StateMachine") :: 
 local MonsterVisual = require(fxFolder:WaitForChild("Visual") :: ModuleScript)
 local MonsterAudio = require(fxFolder:WaitForChild("Audio") :: ModuleScript)
 
--- Runs idle state for a fixed duration.
+local function getRandomIdleDuration(config): number
+	local minDuration = config.Idle.MIN_DURATION
+	local maxDuration = config.Idle.MAX_DURATION
+
+	if maxDuration < minDuration then
+		minDuration, maxDuration = maxDuration, minDuration
+	end
+
+	return minDuration + math.random() * (maxDuration - minDuration)
+end
+
+-- Runs idle state for a duration.
 local function enterIdle(controller, duration: number)
 	local config = controller.Config
 	controller.StateMachine:SetState(MonsterStateMachine.States.Idle)
@@ -44,16 +55,13 @@ local function chooseWanderDestination(controller): (Vector3?, number?, number?)
 		config.Wander.GOAL_ATTEMPTS
 	)
 
-	local path = controller.Movement.ComputePath(config.Path.SETTINGS, controller.RootPart.Position, goal)
+	local path = controller.Movement.ComputePath(config.Path, controller.RootPart.Position, goal)
 	if not path then
 		return nil, nil, nil
 	end
 
-	local selectedPosition, selectedIndex, selectedDistance = controller.Movement.FindWanderWaypoint(
-		path,
-		controller.RootPart.Position,
-		config.Path.WANDER_MIN_WAYPOINT_DISTANCE
-	)
+	local selectedPosition, selectedIndex, selectedDistance =
+		controller.Movement.FindWanderWaypoint(path, controller.RootPart.Position, config.Wander.MIN_WAYPOINT_DISTANCE)
 
 	return selectedPosition, selectedIndex, selectedDistance
 end
@@ -73,13 +81,13 @@ local function wanderStep(controller)
 
 	local destination = chooseWanderDestination(controller)
 	if not destination then
-		enterIdle(controller, config.Wander.PATH_FAIL_IDLE_TIME)
+		enterIdle(controller, getRandomIdleDuration(config))
 		task.wait(config.Wander.PATH_FAIL_RETRY_DELAY)
 		return
 	end
 
 	if os.clock() - wanderStartTime >= config.Wander.MAX_STEP_DURATION then
-		enterIdle(controller, config.Idle.AFTER_WANDER_TIME)
+		enterIdle(controller, getRandomIdleDuration(config))
 		return
 	end
 
@@ -91,14 +99,14 @@ local function wanderStep(controller)
 		controller.Humanoid,
 		controller.RootPart,
 		destination,
-		config.Path.WANDER_REACHED_DISTANCE,
-		config.Path.WANDER_STEP_TIMEOUT,
+		config.Wander.REACHED_DISTANCE,
+		config.Wander.STEP_TIMEOUT,
 		function()
 			controller.Audio.TryPlayFootstep(controller)
 		end
 	)
 
-	enterIdle(controller, config.Idle.AFTER_WANDER_TIME)
+	enterIdle(controller, getRandomIdleDuration(config))
 end
 
 local function playAttackHitPresentation(controller, didAttack: boolean, attackedModel: Model?, attackedRoot: BasePart?)
@@ -160,14 +168,15 @@ local function tryHandleMeleeRange(controller, target: Model, distanceToTarget: 
 end
 
 local function performChaseMoveStep(controller, targetRoot: BasePart)
+	local chaseConfig = controller.Config.Chase
 	local pathConfig = controller.Config.Path
-	local path = controller.Movement.ComputePath(pathConfig.SETTINGS, controller.RootPart.Position, targetRoot.Position)
+	local path = controller.Movement.ComputePath(pathConfig, controller.RootPart.Position, targetRoot.Position)
 	local nextPosition = targetRoot.Position
 	if path then
 		nextPosition = controller.Movement.PickNextWaypoint(
 			path,
 			controller.RootPart,
-			pathConfig.CHASE_MIN_WAYPOINT_DISTANCE,
+			chaseConfig.MIN_WAYPOINT_DISTANCE,
 			targetRoot.Position
 		)
 	end
@@ -176,8 +185,8 @@ local function performChaseMoveStep(controller, targetRoot: BasePart)
 		controller.Humanoid,
 		controller.RootPart,
 		nextPosition,
-		pathConfig.CHASE_REACHED_DISTANCE,
-		pathConfig.CHASE_STEP_TIMEOUT,
+		chaseConfig.REACHED_DISTANCE,
+		chaseConfig.STEP_TIMEOUT,
 		function()
 			controller.Audio.TryPlayFootstep(controller)
 		end
@@ -244,7 +253,7 @@ local function start(controller)
 		if target then
 			chaseTarget(controller, target)
 		else
-			enterIdle(controller, config.Idle.BEFORE_WANDER_TIME)
+			enterIdle(controller, getRandomIdleDuration(config))
 			if not controller._running or controller.Humanoid.Health <= 0 then
 				break
 			end

@@ -55,7 +55,7 @@ function MonsterVisual.SpawnBlood(origin: CFrame, amount: number, effectLifetime
 			part.Size = Vector3.new(0.5, 0.5, 0.5)
 			part.CFrame = origin
 			part.Anchored = false
-			part.CanCollide = true
+			part.CanCollide = false
 			part.Parent = Workspace
 			part.Color = Color3.fromRGB(120, 0, 0)
 			part.Material = Enum.Material.Limestone

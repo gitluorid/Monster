@@ -24,9 +24,9 @@ STARTUP FLOW (FROM SERVER SCRIPT TO AI LOOP)
 2) MonsterAI/Controller.luau
    - Function: MonsterController.new(monster)
    - Validates monster rig (Humanoid + HumanoidRootPart)
-   - Loads submodules: config, movement, combat, VFX, state machine
+   - Loads submodules: config, movement, combat, VFX, audio, state machine
    - Creates one controller table that stores runtime state
-   - Stores VFX runtime fields on controller and creates StateMachine object
+   - Stores VFX/audio runtime fields on controller and creates StateMachine object
 
 ---------------------------------------------------------------------
 MAIN LOOP FLOW (WHAT HAPPENS EVERY TICK)
@@ -79,6 +79,7 @@ chaseTarget(controller, target)
 - State = Chase
 - Sets chase walk speed
 - Plays run animation
+- Plays chase/start + attack/headblow sounds through Audio
 - While target is valid:
   - Re-enforce chase speed if changed
   - Check distance
@@ -87,11 +88,11 @@ chaseTarget(controller, target)
 - Exits when target invalid/out of range
 
 start(controller, enableWanderSounds)
-- Starts VFX module
+- Starts VFX and Audio modules
 - Runs the main behavior loop (target check -> chase OR idle+wander)
 
 stop(controller)
-- Stops VFX
+- Stops VFX and Audio
 - Sets state to Idle
 
 MonsterController.new(monster)
@@ -129,9 +130,6 @@ GetRandomWanderGoal(monsterRoot, wanderRadius, minimumDistance, maxAttempts)
 
 === VFX.luau ===
 
-setFootstepInterval(controller, interval)
-- Changes minimum time between footsteps
-
 playUniqueAnimation(controller, animationName)
 - Plays animation by name
 - Ensures one active animation track at a time
@@ -140,38 +138,49 @@ playIdleAnimation(controller)
 - Tries Idle animation
 - If missing, stops current movement animation
 
-tryPlayFootstep(controller, reason)
-- Plays one footstep if moving and interval threshold passed
-- Uses move direction + horizontal velocity checks
+spawnBlood(origin, amount)
+- Spawns temporary visual blood particles
 
-startWanderSoundLoop(controller)
-- Optional ambient random sounds loop
+playKillBlood(targetModel, targetRoot, amount)
+- Picks blood origin and applies head-removal + blood visual effect
 
-start(controller, enableWanderSounds)
+start(controller)
 - Starts VFX subsystem
 
 stop(controller)
 - Stops VFX subsystem and active animation
 
-MonsterVFX.<helper functions>
-- Includes shared audio/animation helpers used by VFX, controller, and combat
+=== Audio.luau ===
+
+playSound(soundTemplate, parent, cleanUpTime)
+- Clones and plays a sound safely
+
+setFootstepInterval(controller, interval)
+- Changes minimum time between footsteps
+
+tryPlayFootstep(controller)
+- Plays one footstep if moving and interval threshold passed
+
+startWanderSoundLoop(controller)
+- Optional ambient random sounds loop
+
+start(controller, enableWanderSounds)
+- Starts Audio subsystem and optional wander loop
+
+stop(controller)
+- Stops Audio subsystem
 
 === Combat.luau ===
 
 getHumanoidAndRoot(model)
 - Internal helper to read target rig parts safely
 
-spawnBlood(origin, amount)
-- Spawns temporary blood parts for impact feedback
-
 MonsterCombat.PerformSwingAttack(...)
 - Attack cooldown check
 - Target validity checks
-- Play attack animation/sounds
 - Wait for swing hit delay
 - Kill target immediately (Health = 0)
-- Spawn blood
-- Return (didAttack, attackTime)
+- Return (didAttack, attackTime, attackedModel, attackedRoot)
 
 === StateMachine.luau ===
 

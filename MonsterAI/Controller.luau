@@ -1,3 +1,5 @@
+local MonsterController = {}
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
@@ -15,15 +17,16 @@ local configModule = parentFolder:WaitForChild("Config") :: ModuleScript
 local movementModule = parentFolder:WaitForChild("Movement") :: ModuleScript
 local combatModule = parentFolder:WaitForChild("Combat") :: ModuleScript
 local vfxModule = parentFolder:WaitForChild("VFX") :: ModuleScript
+local audioModule = parentFolder:WaitForChild("Audio") :: ModuleScript
 local stateMachineModule = parentFolder:WaitForChild("StateMachine") :: ModuleScript
 
 local Config = require(configModule)
 local Movement = require(movementModule)
 local Combat = require(combatModule)
 local MonsterVFX = require(vfxModule)
+local MonsterAudio = require(audioModule)
 local MonsterStateMachine = require(stateMachineModule)
 
-local MonsterController = {}
 
 -- State transition wrapper.
 local function setState(controller, nextState: string)
@@ -35,7 +38,7 @@ local function enterIdle(controller, duration: number)
 	controller:_setState(MonsterStateMachine.States.Idle)
 	controller.Humanoid.WalkSpeed = 0
 	controller.Humanoid:Move(Vector3.zero)
-	controller.VFX.SetFootstepInterval(controller, controller.Config.WANDER_FOOTSTEP_INTERVAL)
+	controller.Audio.SetFootstepInterval(controller, controller.Config.WANDER_FOOTSTEP_INTERVAL)
 	controller.VFX.PlayIdleAnimation(controller)
 
 	local endTime = os.clock() + duration
@@ -80,7 +83,7 @@ end
 -- 4) Return to idle
 local function wanderStep(controller)
 	controller:_setState(MonsterStateMachine.States.Wander)
-	controller.VFX.SetFootstepInterval(controller, controller.Config.WANDER_FOOTSTEP_INTERVAL)
+	controller.Audio.SetFootstepInterval(controller, controller.Config.WANDER_FOOTSTEP_INTERVAL)
 	controller.Humanoid.WalkSpeed = controller.Config.WANDER_WALK_SPEED
 	controller.VFX.PlayUniqueAnimation(controller, "Walk")
 	local wanderStartTime = os.clock()
@@ -107,7 +110,7 @@ local function wanderStep(controller)
 		5,
 		controller.Config.WANDER_WAYPOINT_TIMEOUT,
 		function()
-			controller.VFX.TryPlayFootstep(controller, "wander")
+			controller.Audio.TryPlayFootstep(controller)
 		end
 	)
 
@@ -117,11 +120,11 @@ end
 -- Chase loop: runs while target is valid and in range.
 local function chaseTarget(controller, target: Model)
 	controller:_setState(MonsterStateMachine.States.Chase)
-	controller.VFX.SetFootstepInterval(controller, controller.Config.CHASE_FOOTSTEP_INTERVAL)
+	controller.Audio.SetFootstepInterval(controller, controller.Config.CHASE_FOOTSTEP_INTERVAL)
 	controller.Humanoid.WalkSpeed = controller.Config.CHASE_WALK_SPEED
 	controller.VFX.PlayUniqueAnimation(controller, "Run")
 
-	controller.VFX.PlaySound(controller.OtherSoundsFolder.StartChaseSound, controller.RootPart, 5)
+	controller.Audio.PlaySound(controller.OtherSoundsFolder.StartChaseSound, controller.RootPart, 5)
 
 	local targetPlayer = Players:GetPlayerFromCharacter(target)
 	if targetPlayer then
@@ -144,18 +147,37 @@ local function chaseTarget(controller, target: Model)
 		end
 
 		if distanceToTarget <= controller.Config.MELEE_RANGE then
+			if os.clock() - controller._lastAttackTime < controller.Config.ATTACK_COOLDOWN then
+				task.wait(0.05)
+				continue
+			end
+
 			controller:_setState(MonsterStateMachine.States.Attack)
-			local _, newLastAttack = controller.Combat.PerformSwingAttack(
+			controller.VFX.PlayUniqueAnimation(controller, "Attack")
+
+			local attackSound = controller.OtherSoundsFolder:FindFirstChild("Attack")
+			if attackSound and attackSound:IsA("Sound") then
+				controller.Audio.PlaySound(attackSound, controller.RootPart, 4)
+			end
+
+			local didAttack, newLastAttack, attackedModel, attackedRoot = controller.Combat.PerformSwingAttack(
 				controller.Monster,
 				target,
 				controller.RootPart,
-				controller.VFX,
-				controller,
-				controller.OtherSoundsFolder,
 				controller.Config,
 				controller._lastAttackTime
 			)
 			controller._lastAttackTime = newLastAttack
+
+			if didAttack and attackedModel and attackedRoot then
+				local headBlowSound = controller.OtherSoundsFolder:FindFirstChild("HeadBlow")
+				if headBlowSound and headBlowSound:IsA("Sound") then
+					controller.Audio.PlaySound(headBlowSound, controller.RootPart, 3)
+				end
+
+				controller.VFX.PlayKillBlood(attackedModel, attackedRoot, controller.Config.BLOOD_PART_AMOUNT)
+			end
+
 			controller:_setState(MonsterStateMachine.States.Chase)
 			task.wait(0.05)
 			continue
@@ -183,7 +205,7 @@ local function chaseTarget(controller, target: Model)
 			controller.Config.CHASE_WAYPOINT_REACHED_DISTANCE or controller.Config.WAYPOINT_REACHED_DISTANCE,
 			controller.Config.CHASE_MOVE_TIMEOUT or 0.4,
 			function()
-				controller.VFX.TryPlayFootstep(controller, "chase")
+				controller.Audio.TryPlayFootstep(controller)
 			end
 		)
 		task.wait()
@@ -197,7 +219,8 @@ local function start(controller, enableWanderSounds: boolean?)
 	end
 
 	controller._running = true
-	controller.VFX.Start(controller, enableWanderSounds == true)
+	controller.VFX.Start(controller)
+	controller.Audio.Start(controller, enableWanderSounds == true)
 
 	while controller._running and controller.Monster.Parent and controller.Humanoid.Health > 0 do
 		local target = controller.Movement.GetClosestTarget(
@@ -228,6 +251,7 @@ local function stop(controller)
 	end
 
 	controller._running = false
+	controller.Audio.Stop(controller)
 	controller.VFX.Stop(controller)
 	controller:_setState(MonsterStateMachine.States.Idle)
 end
@@ -252,6 +276,7 @@ function MonsterController.new(monster: Model)
 		Movement = Movement,
 		Combat = Combat,
 		VFX = MonsterVFX,
+		Audio = MonsterAudio,
 		OtherSoundsFolder = otherSoundsFolder,
 		WanderSoundsFolder = wanderSoundsFolder,
 		StateMachine = MonsterStateMachine.new(MonsterStateMachine.States.Idle),
@@ -261,8 +286,9 @@ function MonsterController.new(monster: Model)
 		_vfxRunning = false,
 		_vfxCurrentAnimationTrack = nil,
 		_vfxCurrentAnimationName = nil,
-		_vfxFootstepInterval = Config.WANDER_FOOTSTEP_INTERVAL,
-		_vfxLastFootstepAt = 0,
+		_audioRunning = false,
+		_audioFootstepInterval = Config.WANDER_FOOTSTEP_INTERVAL,
+		_audioLastFootstepAt = 0,
 
 		_setState = setState,
 		_enterIdle = enterIdle,

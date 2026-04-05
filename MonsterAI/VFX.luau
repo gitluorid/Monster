@@ -1,21 +1,7 @@
 local Debris = game:GetService("Debris")
+local Workspace = game:GetService("Workspace")
 
 local MonsterVFX = {}
-
-local DEFAULT_SOUND_CLEANUP = 5
-
-function MonsterVFX.PlaySound(soundTemplate: Sound, parent: Instance, cleanUpTime: number?): Sound?
-	if not soundTemplate or not parent then
-		return nil
-	end
-
-	local soundClone = soundTemplate:Clone()
-	soundClone.Parent = parent
-	soundClone:Play()
-
-	Debris:AddItem(soundClone, cleanUpTime or DEFAULT_SOUND_CLEANUP)
-	return soundClone
-end
 
 local function playAnimation(animationTemplate: Animation, model: Model): AnimationTrack?
 	if not animationTemplate or not model then
@@ -54,9 +40,39 @@ local function stopAnimation(animationTrack: AnimationTrack?)
 	end
 end
 
--- Updates how often footsteps are allowed to play.
-function MonsterVFX.SetFootstepInterval(controller, interval: number)
-	controller._vfxFootstepInterval = interval
+-- Spawns simple blood particles for visual feedback.
+function MonsterVFX.SpawnBlood(origin: CFrame, amount: number)
+	task.spawn(function()
+		for _ = 1, amount do
+			local part = Instance.new("Part")
+			part.Size = Vector3.new(0.5, 0.5, 0.5)
+			part.CFrame = origin
+			part.Anchored = false
+			part.CanCollide = false
+			part.Parent = Workspace
+			part.Color = Color3.fromRGB(120, 0, 0)
+			part.Material = Enum.Material.Limestone
+
+			local velocity = Instance.new("BodyVelocity")
+			velocity.Velocity = Vector3.new(math.random(-10, 10), math.random(10, 10), math.random(-10, 10))
+			velocity.Parent = part
+
+			Debris:AddItem(velocity, 0.2)
+			Debris:AddItem(part, 5)
+		end
+	end)
+end
+
+-- Chooses blood origin from target head when available, then spawns blood.
+function MonsterVFX.PlayKillBlood(targetModel: Model, targetRoot: BasePart, amount: number)
+	local targetHead = targetModel:FindFirstChild("Head")
+	local bloodOrigin = targetRoot.CFrame
+	if targetHead and targetHead:IsA("BasePart") then
+		bloodOrigin = targetHead.CFrame
+		targetHead:Destroy()
+	end
+
+	MonsterVFX.SpawnBlood(bloodOrigin, amount)
 end
 
 -- Plays an animation by name and ensures only one animation track is active at a time.
@@ -104,83 +120,13 @@ function MonsterVFX.PlayIdleAnimation(controller): AnimationTrack?
 	return nil
 end
 
--- Attempts to play one footstep sound.
--- Returns true when a footstep was played.
-function MonsterVFX.TryPlayFootstep(controller, reason: string?): boolean
-	if not controller._vfxRunning or not controller.Monster.Parent or controller.Humanoid.Health <= 0 then
-		return false
-	end
-
-	local now = os.clock()
-	if now - controller._vfxLastFootstepAt < controller._vfxFootstepInterval then
-		return false
-	end
-
-	local moveMagnitude = controller.Humanoid.MoveDirection.Magnitude
-	local rootPart = controller.Monster:FindFirstChild("HumanoidRootPart")
-	local horizontalSpeed = 0
-	if rootPart and rootPart:IsA("BasePart") then
-		horizontalSpeed = Vector3.new(rootPart.AssemblyLinearVelocity.X, 0, rootPart.AssemblyLinearVelocity.Z).Magnitude
-	end
-
-	if
-		moveMagnitude <= controller.Config.FOOTSTEP_MOVE_THRESHOLD
-		and horizontalSpeed <= controller.Config.FOOTSTEP_MOVE_THRESHOLD
-	then
-		return false
-	end
-
-	local footstepSound = controller.OtherSoundsFolder:FindFirstChild("WanderFootstep")
-	local soundParent = controller.Monster.PrimaryPart
-		or controller.Monster:FindFirstChild("HumanoidRootPart")
-		or controller.Monster:FindFirstChildWhichIsA("BasePart")
-
-	if not footstepSound or not footstepSound:IsA("Sound") then
-		return false
-	end
-
-	if not soundParent then
-		return false
-	end
-
-	MonsterVFX.PlaySound(footstepSound, soundParent, 1)
-	controller._vfxLastFootstepAt = now
-	return true
-end
-
--- Optional ambient wander sounds loop.
-local function startWanderSoundLoop(controller)
-	if not controller.WanderSoundsFolder then
-		return
-	end
-
-	task.spawn(function()
-		while controller._vfxRunning and controller.Monster.Parent and controller.Humanoid.Health > 0 do
-			local availableSounds = controller.WanderSoundsFolder:GetChildren()
-			if #availableSounds > 0 then
-				local randomSound = availableSounds[math.random(1, #availableSounds)]
-				if randomSound:IsA("Sound") then
-					MonsterVFX.PlaySound(randomSound, controller.Monster)
-					task.wait(randomSound.TimeLength + 0.1)
-				end
-			end
-
-			task.wait(math.random(20, 90))
-		end
-	end)
-end
-
 -- Starts VFX subsystem for this monster.
-function MonsterVFX.Start(controller, enableWanderSounds: boolean)
+function MonsterVFX.Start(controller)
 	if controller._vfxRunning then
 		return
 	end
 
 	controller._vfxRunning = true
-
-	if enableWanderSounds then
-		startWanderSoundLoop(controller)
-	end
 end
 
 -- Stops VFX and active animation track.

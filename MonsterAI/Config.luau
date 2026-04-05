@@ -48,22 +48,22 @@ local Config = {
 
 	-- Wander target selection, move thresholds, and retry pacing.
 	Wander = {
-		-- Radius around monster used for random wander goals.
+		-- Maximum distance for random wander goals.
 		RADIUS = 150,
 		-- Minimum distance required for a random wander goal.
-		MIN_GOAL_DISTANCE = 35,
+		MIN_GOAL_DISTANCE = 30,
 		-- Number of random attempts before using fallback goal.
-		GOAL_ATTEMPTS = 10,
+		GOAL_ATTEMPTS = 5,
 		-- Max seconds allowed for one wander step attempt.
-		MAX_STEP_DURATION = 3.5,
+		MAX_STEP_DURATION = 2.5,
 		-- Delay before retrying wander after path failure.
 		PATH_FAIL_RETRY_DELAY = 0.2,
 		-- Minimum distance from start before accepting a wander waypoint.
-		MIN_WAYPOINT_DISTANCE = 100,
+		MIN_WAYPOINT_DISTANCE = 10,
 		-- Close-enough distance to consider wander MoveTo complete.
 		REACHED_DISTANCE = 5,
 		-- Maximum seconds to wait for one wander MoveTo step.
-		STEP_TIMEOUT = 20,
+		STEP_TIMEOUT = 2.5,
 	},
 
 	-- Chase movement tuning for path-following responsiveness.

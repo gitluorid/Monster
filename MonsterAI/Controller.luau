@@ -44,32 +44,24 @@ local function enterIdle(controller, duration: number)
 	end
 end
 
--- Chooses one wander destination point from path waypoints.
--- Returns position metadata, or nil on failure.
-local function chooseWanderDestination(controller): (Vector3?, number?, number?)
+-- Chooses one random wander goal and returns the goal position and distance from start.
+local function chooseWanderGoal(controller): (Vector3, number)
 	local config = controller.Config
+	local startPosition = controller.RootPart.Position
 	local goal = controller.Movement.GetRandomWanderGoal(
 		controller.RootPart,
 		config.Wander.RADIUS,
 		config.Wander.MIN_GOAL_DISTANCE,
 		config.Wander.GOAL_ATTEMPTS
 	)
-
-	local path = controller.Movement.ComputePath(config.Path, controller.RootPart.Position, goal)
-	if not path then
-		return nil, nil, nil
-	end
-
-	local selectedPosition, selectedIndex, selectedDistance =
-		controller.Movement.FindWanderWaypoint(path, controller.RootPart.Position, config.Wander.MIN_WAYPOINT_DISTANCE)
-
-	return selectedPosition, selectedIndex, selectedDistance
+	local goalDistance = (startPosition - goal).Magnitude
+	return goal, goalDistance
 end
 
 -- Single wander action:
 -- 1) Enter wander state
--- 2) Pick one destination
--- 3) Move once
+-- 2) Pick one random goal
+-- 3) Repath in short waypoint steps toward that goal
 -- 4) Return to idle
 local function wanderStep(controller)
 	local config = controller.Config
@@ -78,33 +70,84 @@ local function wanderStep(controller)
 	controller.Humanoid.WalkSpeed = config.MovementSpeeds.WANDER
 	controller.Visual.PlayUniqueAnimation(controller, "Walk")
 	local wanderStartTime = os.clock()
+	local wanderGoal, goalDistance = chooseWanderGoal(controller)
+	local wanderSpeed = math.max(0.1, config.MovementSpeeds.WANDER)
+	local wanderTimeBudget = math.max(config.Wander.MAX_STEP_DURATION, (goalDistance / wanderSpeed) + 1)
+	local loggedGoal = false
 
-	local destination = chooseWanderDestination(controller)
-	if not destination then
-		enterIdle(controller, getRandomIdleDuration(config))
-		task.wait(config.Wander.PATH_FAIL_RETRY_DELAY)
-		return
-	end
-
-	if os.clock() - wanderStartTime >= config.Wander.MAX_STEP_DURATION then
-		enterIdle(controller, getRandomIdleDuration(config))
-		return
-	end
-
-	if not controller._running or controller.Humanoid.Health <= 0 then
-		return
-	end
-
-	controller.Movement.MoveToPosition(
-		controller.Humanoid,
-		controller.RootPart,
-		destination,
-		config.Wander.REACHED_DISTANCE,
-		config.Wander.STEP_TIMEOUT,
-		function()
-			controller.Audio.TryPlayFootstep(controller)
+	while controller._running and controller.Humanoid.Health > 0 do
+		local elapsed = os.clock() - wanderStartTime
+		if elapsed >= wanderTimeBudget then
+			break
 		end
-	)
+
+		local path = controller.Movement.ComputePath(config.Path, controller.RootPart.Position, wanderGoal)
+		if not path then
+			if not loggedGoal then
+				print(
+					("[MonsterAI][Wander] New goal set: goalDistance=%.2f, waypointDistance=nil (path failed)"):format(
+						goalDistance
+					)
+				)
+				loggedGoal = true
+			end
+
+			task.wait(config.Wander.PATH_FAIL_RETRY_DELAY)
+			continue
+		end
+
+		local waypointPosition = controller.Movement.PickNextWaypoint(
+			path,
+			controller.RootPart,
+			config.Wander.MIN_WAYPOINT_DISTANCE,
+			wanderGoal
+		)
+		local waypointDistance = (controller.RootPart.Position - waypointPosition).Magnitude
+
+		if not loggedGoal then
+			print(
+				("[MonsterAI][Wander] New goal set: goalDistance=%.2f, waypointDistance=%.2f"):format(
+					goalDistance,
+					waypointDistance
+				)
+			)
+			loggedGoal = true
+		end
+
+		local remainingTime = wanderTimeBudget - elapsed
+		local stepTimeout = math.min(config.Wander.STEP_TIMEOUT, remainingTime)
+		if stepTimeout <= 0 then
+			break
+		end
+
+		controller.Movement.MoveToPosition(
+			controller.Humanoid,
+			controller.RootPart,
+			waypointPosition,
+			config.Wander.REACHED_DISTANCE,
+			stepTimeout,
+			function()
+				controller.Audio.TryPlayFootstep(controller)
+			end
+		)
+
+		local currentPosition = controller.RootPart.Position
+		if (currentPosition - wanderGoal).Magnitude <= config.Wander.REACHED_DISTANCE then
+			print(
+				("[MonsterAI][Wander] Reached goal: monsterPos=(%.2f, %.2f, %.2f), goalPos=(%.2f, %.2f, %.2f)"):format(
+					currentPosition.X,
+					currentPosition.Y,
+					currentPosition.Z,
+					wanderGoal.X,
+					wanderGoal.Y,
+					wanderGoal.Z
+				)
+			)
+			break
+		end
+
+		task.wait()
+	end
 
 	enterIdle(controller, getRandomIdleDuration(config))
 end

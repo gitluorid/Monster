@@ -119,25 +119,43 @@ function MonsterMovement.PickNextWaypoint(
 	return nextPosition
 end
 
--- For wander movement: find first waypoint that is far enough from where wander started.
+-- For wander movement: prefer the farthest waypoint that is far enough from start.
+-- Falls back to the last waypoint so one-step wander heads toward the goal instead of stopping early.
 function MonsterMovement.FindWanderWaypoint(
 	path: Path,
 	startPosition: Vector3,
 	minimumDistance: number
 ): (Vector3?, number?, number?)
 	local waypoints = path:GetWaypoints()
+	local selectedPosition: Vector3? = nil
+	local selectedIndex: number? = nil
+	local selectedDistance: number? = nil
+	local lastWaypointPosition: Vector3? = nil
+	local lastWaypointIndex: number? = nil
+	local lastWaypointDistance: number? = nil
+
 	for index, waypoint in ipairs(waypoints) do
 		if index == 1 then
 			continue
 		end
 
 		local distanceFromStart = (startPosition - waypoint.Position).Magnitude
+		lastWaypointPosition = waypoint.Position
+		lastWaypointIndex = index
+		lastWaypointDistance = distanceFromStart
+
 		if distanceFromStart >= minimumDistance then
-			return waypoint.Position, index, distanceFromStart
+			selectedPosition = waypoint.Position
+			selectedIndex = index
+			selectedDistance = distanceFromStart
 		end
 	end
 
-	return nil, nil, nil
+	if selectedPosition then
+		return selectedPosition, selectedIndex, selectedDistance
+	end
+
+	return lastWaypointPosition, lastWaypointIndex, lastWaypointDistance
 end
 
 -- Picks a random wander goal around the monster.
@@ -148,20 +166,22 @@ function MonsterMovement.GetRandomWanderGoal(
 	minimumDistance: number?,
 	maxAttempts: number?
 ): Vector3
-	local minDistance = math.clamp(minimumDistance or 0, 0, math.max(0, wanderRadius))
+	local maxDistance = math.max(0, wanderRadius)
+	local minDistance = math.clamp(minimumDistance or 0, 0, maxDistance)
 	local attempts = math.max(1, maxAttempts or 8)
 
 	for _ = 1, attempts do
 		local randomOffset =
-			Vector3.new(math.random(-wanderRadius, wanderRadius), 0, math.random(-wanderRadius, wanderRadius))
+			Vector3.new(math.random(-maxDistance, maxDistance), 0, math.random(-maxDistance, maxDistance))
+		local offsetDistance = randomOffset.Magnitude
 
-		if randomOffset.Magnitude >= minDistance then
+		if offsetDistance >= minDistance and offsetDistance <= maxDistance then
 			return monsterRoot.Position + randomOffset
 		end
 	end
 
 	local fallbackAngle = math.random() * math.pi * 2
-	local fallbackDistance = math.max(minDistance, wanderRadius * 0.65)
+	local fallbackDistance = minDistance + math.random() * (maxDistance - minDistance)
 	local fallbackOffset =
 		Vector3.new(math.cos(fallbackAngle) * fallbackDistance, 0, math.sin(fallbackAngle) * fallbackDistance)
 

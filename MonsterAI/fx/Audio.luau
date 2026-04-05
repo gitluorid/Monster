@@ -109,7 +109,7 @@ local function getWanderAmbientSounds(): { Sound }
 	return ambientSounds
 end
 
--- Optional ambient wander sounds loop.
+-- Ambient wander sounds loop.
 local function startWanderSoundLoop(controller)
 	local ambientConfig = controller.Config.Audio.Ambient
 	local minDelay = math.max(0, ambientConfig.MIN_DELAY)
@@ -132,16 +132,13 @@ local function startWanderSoundLoop(controller)
 	end)
 end
 
-function MonsterAudio.Start(controller, enableWanderSounds: boolean)
+function MonsterAudio.Start(controller)
 	if controller._audioRunning then
 		return
 	end
 
 	controller._audioRunning = true
-
-	if enableWanderSounds then
-		startWanderSoundLoop(controller)
-	end
+	startWanderSoundLoop(controller)
 end
 
 function MonsterAudio.Stop(controller)

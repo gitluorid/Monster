@@ -215,7 +215,7 @@ local function chaseTarget(controller, target: Model)
 end
 
 -- Main update loop for one monster controller instance.
-local function start(controller, enableWanderSounds: boolean?)
+local function start(controller)
 	local config = controller.Config
 	if controller._running then
 		return
@@ -223,7 +223,7 @@ local function start(controller, enableWanderSounds: boolean?)
 
 	controller._running = true
 	controller.Visual.Start(controller)
-	controller.Audio.Start(controller, enableWanderSounds == true)
+	controller.Audio.Start(controller)
 
 	while controller._running and controller.Monster.Parent and controller.Humanoid.Health > 0 do
 		local target =
@@ -241,7 +241,7 @@ local function start(controller, enableWanderSounds: boolean?)
 
 		task.wait(config.Loop.MAIN_TICK_INTERVAL)
 	end
-	controller:Stop()
+	controller:Stop() -- Ensure we clean up if we exited the loop without an explicit stop call.
 end
 
 -- Stops this controller instance.

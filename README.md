@@ -40,17 +40,27 @@ if not monster:IsA("Model") then
     return
 end
 
-MonsterAI.StartController(monster :: Model, true)
+MonsterAI.StartController(monster :: Model)
+
+task.delay(20, function()
+  MonsterAI.StopController(monster :: Model)
+end)
 ```
 
-`StartController(monster, enableWanderSounds)`:
+`StartController(monster)`:
 
 - `monster`: target monster `Model`.
-- `enableWanderSounds`: set `true` to enable ambient wander sounds, or `false` to disable.
+- Starts the controller in a spawned task and returns immediately.
+- Ambient wander sounds are always enabled.
+
+`StopController(monster)`:
+
+- `monster`: target monster `Model`.
+- Stops the currently running controller for that monster.
 
 ## Runtime Flow
 
-1. `MonsterAI/init.luau` calls `Controller.new(monster)`.
+1. `MonsterAI/init.luau` calls `Controller.new(monster)` and starts it in a spawned task.
 2. Controller validates the rig (`Humanoid` and `HumanoidRootPart`).
 3. Controller starts the `Visual` and `Audio` subsystems.
 4. Main loop runs:
@@ -169,7 +179,7 @@ Optional blood templates for kill VFX:
 
 1. Confirm `MonsterAI/fx/Sounds` contains required one-shot sounds.
 2. Check that sound objects are `Sound` instances and not muted.
-3. If ambient sounds are expected, verify `enableWanderSounds` is `true` when starting the controller.
+3. Ambient sounds are always started with the controller, so verify ambient sound assets exist in `MonsterAI/fx/Sounds`.
 
 ### Kill blood effect does not appear
 

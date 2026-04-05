@@ -73,7 +73,6 @@ local function wanderStep(controller)
 	local wanderGoal, goalDistance = chooseWanderGoal(controller)
 	local wanderSpeed = math.max(0.1, config.MovementSpeeds.WANDER)
 	local wanderTimeBudget = math.max(config.Wander.MAX_STEP_DURATION, (goalDistance / wanderSpeed) + 1)
-	local loggedGoal = false
 
 	while controller._running and controller.Humanoid.Health > 0 do
 		local elapsed = os.clock() - wanderStartTime
@@ -83,15 +82,6 @@ local function wanderStep(controller)
 
 		local path = controller.Movement.ComputePath(config.Path, controller.RootPart.Position, wanderGoal)
 		if not path then
-			if not loggedGoal then
-				print(
-					("[MonsterAI][Wander] New goal set: goalDistance=%.2f, waypointDistance=nil (path failed)"):format(
-						goalDistance
-					)
-				)
-				loggedGoal = true
-			end
-
 			task.wait(config.Wander.PATH_FAIL_RETRY_DELAY)
 			continue
 		end
@@ -102,17 +92,6 @@ local function wanderStep(controller)
 			config.Wander.MIN_WAYPOINT_DISTANCE,
 			wanderGoal
 		)
-		local waypointDistance = (controller.RootPart.Position - waypointPosition).Magnitude
-
-		if not loggedGoal then
-			print(
-				("[MonsterAI][Wander] New goal set: goalDistance=%.2f, waypointDistance=%.2f"):format(
-					goalDistance,
-					waypointDistance
-				)
-			)
-			loggedGoal = true
-		end
 
 		local remainingTime = wanderTimeBudget - elapsed
 		local stepTimeout = math.min(config.Wander.STEP_TIMEOUT, remainingTime)
@@ -131,18 +110,7 @@ local function wanderStep(controller)
 			end
 		)
 
-		local currentPosition = controller.RootPart.Position
-		if (currentPosition - wanderGoal).Magnitude <= config.Wander.REACHED_DISTANCE then
-			print(
-				("[MonsterAI][Wander] Reached goal: monsterPos=(%.2f, %.2f, %.2f), goalPos=(%.2f, %.2f, %.2f)"):format(
-					currentPosition.X,
-					currentPosition.Y,
-					currentPosition.Z,
-					wanderGoal.X,
-					wanderGoal.Y,
-					wanderGoal.Z
-				)
-			)
+		if (controller.RootPart.Position - wanderGoal).Magnitude <= config.Wander.REACHED_DISTANCE then
 			break
 		end
 

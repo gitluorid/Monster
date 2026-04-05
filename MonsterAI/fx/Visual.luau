@@ -7,7 +7,6 @@ if not fxFolder then
 	error("MonsterVisual must be parented under fx")
 end
 local animationsFolder = fxFolder:WaitForChild("Animations")
-local objectsFolder = fxFolder:WaitForChild("Objects")
 local DEFAULT_EFFECT_LIFETIME = 5
 
 local function playAnimation(animationTemplate: Animation, model: Model): AnimationTrack?
@@ -47,71 +46,6 @@ local function stopAnimation(animationTrack: AnimationTrack?)
 	end
 end
 
-local function emitParticles(root: Instance)
-	for _, descendant in root:GetDescendants() do
-		if descendant:IsA("ParticleEmitter") then
-			local emitCount = descendant:GetAttribute("EmitCount")
-			descendant:Emit(typeof(emitCount) == "number" and emitCount or 20)
-		end
-	end
-end
-
-local function placeTemplateAtOrigin(template: Instance, origin: CFrame, effectLifetime: number?): boolean
-	local lifetime = effectLifetime or DEFAULT_EFFECT_LIFETIME
-	if template:IsA("Model") then
-		local clone = template:Clone()
-		clone.Parent = Workspace
-		local targetPart = clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart", true)
-		if targetPart then
-			clone:PivotTo(origin)
-		end
-		emitParticles(clone)
-		Debris:AddItem(clone, lifetime)
-		return true
-	end
-
-	if template:IsA("BasePart") then
-		local clone = template:Clone()
-		clone.CFrame = origin
-		clone.Parent = Workspace
-		emitParticles(clone)
-		Debris:AddItem(clone, lifetime)
-		return true
-	end
-
-	local anchor = Instance.new("Part")
-	anchor.Name = "VisualAnchor"
-	anchor.Size = Vector3.new(0.2, 0.2, 0.2)
-	anchor.CFrame = origin
-	anchor.Anchored = true
-	anchor.CanCollide = false
-	anchor.CanTouch = false
-	anchor.CanQuery = false
-	anchor.Transparency = 1
-	anchor.Parent = Workspace
-
-	local clone = template:Clone()
-	clone.Parent = anchor
-
-	emitParticles(anchor)
-	Debris:AddItem(anchor, lifetime)
-	return true
-end
-
-local function tryPlayBloodTemplate(bloodOrigin: CFrame, effectLifetime: number?): boolean
-	local bloodTemplate = objectsFolder:FindFirstChild("NeckBlood")
-		or objectsFolder:FindFirstChild("Blood")
-		or objectsFolder:FindFirstChildWhichIsA("Model")
-		or objectsFolder:FindFirstChildWhichIsA("BasePart")
-		or objectsFolder:FindFirstChildWhichIsA("ParticleEmitter", true)
-
-	if not bloodTemplate then
-		return false
-	end
-
-	return placeTemplateAtOrigin(bloodTemplate, bloodOrigin, effectLifetime)
-end
-
 -- Spawns simple blood particles for visual feedback.
 function MonsterVisual.SpawnBlood(origin: CFrame, amount: number, effectLifetime: number?)
 	local lifetime = effectLifetime or DEFAULT_EFFECT_LIFETIME
@@ -121,13 +55,13 @@ function MonsterVisual.SpawnBlood(origin: CFrame, amount: number, effectLifetime
 			part.Size = Vector3.new(0.5, 0.5, 0.5)
 			part.CFrame = origin
 			part.Anchored = false
-			part.CanCollide = false
+			part.CanCollide = true
 			part.Parent = Workspace
 			part.Color = Color3.fromRGB(120, 0, 0)
 			part.Material = Enum.Material.Limestone
-
+			part.Parent = workspace
 			local velocity = Instance.new("BodyVelocity")
-			velocity.Velocity = Vector3.new(math.random(-10, 10), math.random(10, 10), math.random(-10, 10))
+			velocity.Velocity = Vector3.new(math.random(-20, 20), math.random(10, 20), math.random(-20, 20))
 			velocity.Parent = part
 
 			Debris:AddItem(velocity, 0.2)
@@ -137,7 +71,7 @@ function MonsterVisual.SpawnBlood(origin: CFrame, amount: number, effectLifetime
 end
 
 -- Chooses blood origin from target head when available, then plays kill blood visual effects.
-function MonsterVisual.PlayKillBlood(controller, targetModel: Model, targetRoot: BasePart, amount: number)
+function MonsterVisual.PlayKillBloodEffect(controller, targetModel: Model, targetRoot: BasePart, amount: number)
 	local effectLifetime = controller.Config.Visual.EFFECT_LIFETIME
 	local targetHead = targetModel:FindFirstChild("Head")
 	local bloodOrigin = targetRoot.CFrame
@@ -146,9 +80,7 @@ function MonsterVisual.PlayKillBlood(controller, targetModel: Model, targetRoot:
 		targetHead:Destroy()
 	end
 
-	if not tryPlayBloodTemplate(bloodOrigin, effectLifetime) then
-		MonsterVisual.SpawnBlood(bloodOrigin, amount, effectLifetime)
-	end
+	MonsterVisual.SpawnBlood(bloodOrigin, amount, effectLifetime)
 end
 
 -- Plays an animation by name and ensures only one animation track is active at a time.

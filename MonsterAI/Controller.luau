@@ -3,6 +3,9 @@ local MonsterController = {}
 local logicFolder = (script.Parent :: Instance):WaitForChild("logic")
 local fxFolder = (script.Parent :: Instance):WaitForChild("fx")
 
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local remote = replicatedStorage:WaitForChild("Remotes"):WaitForChild("MonsterChasingEvent")
+
 local MonsterConfig = require((script.Parent :: Instance):WaitForChild("Config") :: ModuleScript)
 local MovementLogic = require(logicFolder:WaitForChild("Movement") :: ModuleScript)
 local CombatLogic = require(logicFolder:WaitForChild("Combat") :: ModuleScript)
@@ -108,7 +111,12 @@ local function playAttackHitPresentation(controller, didAttack: boolean, attacke
 		controller.Audio.PlaySound(headBlowSound, controller.RootPart, 3)
 	end
 
-	controller.Visual.PlayKillBlood(controller, attackedModel, attackedRoot, controller.Config.Visual.BLOOD_PART_AMOUNT)
+	controller.Visual.PlayKillBloodEffect(
+		controller,
+		attackedModel,
+		attackedRoot,
+		controller.Config.Visual.BLOOD_PART_AMOUNT
+	)
 end
 
 local function performMeleeAttack(controller, target: Model)
@@ -189,6 +197,10 @@ local function chaseTarget(controller, target: Model)
 	if startChaseSound then
 		controller.Audio.PlaySound(startChaseSound, controller.RootPart, 5)
 	end
+
+	local targetPlayer = game.Players:GetPlayerFromCharacter(target)
+
+	--remote:FireClient(targetPlayer)
 
 	while controller._running and controller.Movement.IsValidTarget(target, controller.Monster) do
 		if controller.Humanoid.WalkSpeed ~= config.MovementSpeeds.CHASE then

@@ -84,7 +84,7 @@ local Config = {
 
 	Visual = {
 		BLOOD_PART_AMOUNT = 60,
-		EFFECT_LIFETIME = 5,
+		EFFECT_LIFETIME = 100,
 	},
 
 	Loop = {

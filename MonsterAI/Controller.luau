@@ -1,11 +1,9 @@
 local MonsterController = {}
 
-local parentFolder = script.Parent
+local logicFolder = (script.Parent :: Instance):WaitForChild("logic")
+local fxFolder = (script.Parent :: Instance):WaitForChild("fx")
 
-local logicFolder = parentFolder:WaitForChild("logic")
-local fxFolder = parentFolder:WaitForChild("fx")
-
-local MonsterConfig = require(parentFolder:WaitForChild("Config") :: ModuleScript)
+local MonsterConfig = require((script.Parent :: Instance):WaitForChild("Config") :: ModuleScript)
 local MovementLogic = require(logicFolder:WaitForChild("Movement") :: ModuleScript)
 local CombatLogic = require(logicFolder:WaitForChild("Combat") :: ModuleScript)
 local MonsterStateMachine = require(logicFolder:WaitForChild("StateMachine") :: ModuleScript)

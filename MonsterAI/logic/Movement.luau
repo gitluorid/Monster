@@ -45,7 +45,7 @@ function MonsterMovement.GetClosestTarget(monster: Model, monsterRoot: BasePart,
 	return closestTarget
 end
 
--- Computes a path from startPosition to endPosition using Roblox pathfinding.
+-- Computes a path from startPosition to endPosition using pathfinding.
 function MonsterMovement.ComputePath(
 	pathSettings: { [string]: any },
 	startPosition: Vector3,

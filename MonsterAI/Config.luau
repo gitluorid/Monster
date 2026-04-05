@@ -80,7 +80,7 @@ local Config = {
 	BLOOD_PART_AMOUNT = 60,
 
 	-- =============================
-	-- Roblox Pathfinding Settings
+	-- Pathfinding Settings
 	-- =============================
 	PATH_SETTINGS = {
 		AgentRadius = 4,

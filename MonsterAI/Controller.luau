@@ -1,32 +1,26 @@
 local MonsterController = {}
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-
-local replicatedStorage = game:GetService("ReplicatedStorage")
-local remotes = replicatedStorage:WaitForChild("Remotes")
-
-local chasingEvent = remotes:WaitForChild("MonsterChasingEvent")
-
 local parentFolder = script.Parent
 if not parentFolder then
 	error("MonsterController must be parented before requires")
 end
 
+local logicFolder = parentFolder:WaitForChild("logic")
+local fxFolder = parentFolder:WaitForChild("fx")
+
 local configModule = parentFolder:WaitForChild("Config") :: ModuleScript
-local movementModule = parentFolder:WaitForChild("Movement") :: ModuleScript
-local combatModule = parentFolder:WaitForChild("Combat") :: ModuleScript
-local vfxModule = parentFolder:WaitForChild("VFX") :: ModuleScript
-local audioModule = parentFolder:WaitForChild("Audio") :: ModuleScript
-local stateMachineModule = parentFolder:WaitForChild("StateMachine") :: ModuleScript
+local movementModule = logicFolder:WaitForChild("Movement") :: ModuleScript
+local combatModule = logicFolder:WaitForChild("Combat") :: ModuleScript
+local stateMachineModule = logicFolder:WaitForChild("StateMachine") :: ModuleScript
+local visualModule = fxFolder:WaitForChild("Visual") :: ModuleScript
+local audioModule = fxFolder:WaitForChild("Audio") :: ModuleScript
 
 local Config = require(configModule)
 local Movement = require(movementModule)
 local Combat = require(combatModule)
-local MonsterVFX = require(vfxModule)
+local MonsterVisual = require(visualModule)
 local MonsterAudio = require(audioModule)
 local MonsterStateMachine = require(stateMachineModule)
-
 
 -- State transition wrapper.
 local function setState(controller, nextState: string)
@@ -39,7 +33,7 @@ local function enterIdle(controller, duration: number)
 	controller.Humanoid.WalkSpeed = 0
 	controller.Humanoid:Move(Vector3.zero)
 	controller.Audio.SetFootstepInterval(controller, controller.Config.WANDER_FOOTSTEP_INTERVAL)
-	controller.VFX.PlayIdleAnimation(controller)
+	controller.Visual.PlayIdleAnimation(controller)
 
 	local endTime = os.clock() + duration
 	while
@@ -85,7 +79,7 @@ local function wanderStep(controller)
 	controller:_setState(MonsterStateMachine.States.Wander)
 	controller.Audio.SetFootstepInterval(controller, controller.Config.WANDER_FOOTSTEP_INTERVAL)
 	controller.Humanoid.WalkSpeed = controller.Config.WANDER_WALK_SPEED
-	controller.VFX.PlayUniqueAnimation(controller, "Walk")
+	controller.Visual.PlayUniqueAnimation(controller, "Walk")
 	local wanderStartTime = os.clock()
 
 	local destination = chooseWanderDestination(controller)
@@ -122,13 +116,11 @@ local function chaseTarget(controller, target: Model)
 	controller:_setState(MonsterStateMachine.States.Chase)
 	controller.Audio.SetFootstepInterval(controller, controller.Config.CHASE_FOOTSTEP_INTERVAL)
 	controller.Humanoid.WalkSpeed = controller.Config.CHASE_WALK_SPEED
-	controller.VFX.PlayUniqueAnimation(controller, "Run")
+	controller.Visual.PlayUniqueAnimation(controller, "Run")
 
-	controller.Audio.PlaySound(controller.OtherSoundsFolder.StartChaseSound, controller.RootPart, 5)
-
-	local targetPlayer = Players:GetPlayerFromCharacter(target)
-	if targetPlayer then
-		chasingEvent:FireClient(targetPlayer)
+	local startChaseSound = controller.Audio.FindSound(controller, "StartChaseSound")
+	if startChaseSound then
+		controller.Audio.PlaySound(startChaseSound, controller.RootPart, 5)
 	end
 
 	while controller._running and controller.Movement.IsValidTarget(target, controller.Monster) do
@@ -153,9 +145,9 @@ local function chaseTarget(controller, target: Model)
 			end
 
 			controller:_setState(MonsterStateMachine.States.Attack)
-			controller.VFX.PlayUniqueAnimation(controller, "Attack")
+			controller.Visual.PlayUniqueAnimation(controller, "Attack")
 
-			local attackSound = controller.OtherSoundsFolder:FindFirstChild("Attack")
+			local attackSound = controller.Audio.FindSound(controller, "Attack")
 			if attackSound and attackSound:IsA("Sound") then
 				controller.Audio.PlaySound(attackSound, controller.RootPart, 4)
 			end
@@ -170,12 +162,17 @@ local function chaseTarget(controller, target: Model)
 			controller._lastAttackTime = newLastAttack
 
 			if didAttack and attackedModel and attackedRoot then
-				local headBlowSound = controller.OtherSoundsFolder:FindFirstChild("HeadBlow")
+				local headBlowSound = controller.Audio.FindSound(controller, "HeadBlow")
 				if headBlowSound and headBlowSound:IsA("Sound") then
 					controller.Audio.PlaySound(headBlowSound, controller.RootPart, 3)
 				end
 
-				controller.VFX.PlayKillBlood(attackedModel, attackedRoot, controller.Config.BLOOD_PART_AMOUNT)
+				controller.Visual.PlayKillBlood(
+					controller,
+					attackedModel,
+					attackedRoot,
+					controller.Config.BLOOD_PART_AMOUNT
+				)
 			end
 
 			controller:_setState(MonsterStateMachine.States.Chase)
@@ -219,7 +216,7 @@ local function start(controller, enableWanderSounds: boolean?)
 	end
 
 	controller._running = true
-	controller.VFX.Start(controller)
+	controller.Visual.Start(controller)
 	controller.Audio.Start(controller, enableWanderSounds == true)
 
 	while controller._running and controller.Monster.Parent and controller.Humanoid.Health > 0 do
@@ -252,7 +249,7 @@ local function stop(controller)
 
 	controller._running = false
 	controller.Audio.Stop(controller)
-	controller.VFX.Stop(controller)
+	controller.Visual.Stop(controller)
 	controller:_setState(MonsterStateMachine.States.Idle)
 end
 
@@ -263,9 +260,9 @@ function MonsterController.new(monster: Model)
 		return nil, "Monster is missing Humanoid or HumanoidRootPart"
 	end
 
-	local animationsFolder = ReplicatedStorage:WaitForChild("Monster"):WaitForChild("Animations")
-	local otherSoundsFolder = parentFolder:WaitForChild("OtherSounds")
-	local wanderSoundsFolder = parentFolder:FindFirstChild("WanderSounds")
+	local animationsFolder = fxFolder:WaitForChild("Animations")
+	local objectsFolder = fxFolder:WaitForChild("Objects")
+	local soundsFolder = fxFolder:WaitForChild("Sounds")
 
 	local controller = {
 		Monster = monster,
@@ -275,17 +272,17 @@ function MonsterController.new(monster: Model)
 		Config = Config,
 		Movement = Movement,
 		Combat = Combat,
-		VFX = MonsterVFX,
+		Visual = MonsterVisual,
 		Audio = MonsterAudio,
-		OtherSoundsFolder = otherSoundsFolder,
-		WanderSoundsFolder = wanderSoundsFolder,
+		SoundsFolder = soundsFolder,
+		ObjectsFolder = objectsFolder,
 		StateMachine = MonsterStateMachine.new(MonsterStateMachine.States.Idle),
 
 		_running = false,
 		_lastAttackTime = 0,
-		_vfxRunning = false,
-		_vfxCurrentAnimationTrack = nil,
-		_vfxCurrentAnimationName = nil,
+		_visualRunning = false,
+		_visualCurrentAnimationTrack = nil,
+		_visualCurrentAnimationName = nil,
 		_audioRunning = false,
 		_audioFootstepInterval = Config.WANDER_FOOTSTEP_INTERVAL,
 		_audioLastFootstepAt = 0,

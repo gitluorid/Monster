@@ -101,7 +101,24 @@ MonsterAI.StartController(monster :: Model, true)
 
 ### `Config.luau`
 
-- Single source of gameplay and pacing values (combat ranges/cooldowns, movement speeds, idle/wander timing, path settings, presentation tuning).
+- Single source of gameplay and pacing values, grouped by behavior area.
+
+Current top-level groups:
+
+- `Combat`: detection, melee range, cooldown/windup, and knockback values.
+- `MovementSpeeds`: wander/chase walk speed.
+- `Idle`: idle timing before/after wander.
+- `Wander`: random goal selection and fail-retry pacing.
+- `Path`: chase and wander movement thresholds + pathfinding settings.
+- `Audio`: footstep pacing and ambient delay range.
+- `Visual`: blood amount and visual effect lifetime.
+- `Loop`: main AI loop cadence.
+
+Important chase tuning:
+
+- `Path.CHASE_STEP_TIMEOUT` = maximum time a single chase `MoveTo` step can run before controller repaths.
+- Lower value: faster repath and more responsive pursuit.
+- Higher value: fewer repaths but slower reaction to moving targets.
 
 ## Asset Expectations
 

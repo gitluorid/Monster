@@ -4,7 +4,7 @@ local Workspace = game:GetService("Workspace")
 local MonsterMovement = {}
 
 -- Returns a model's Humanoid and HumanoidRootPart if available.
-function MonsterMovement.GetHumanoidAndRoot(model: Model): (Humanoid?, BasePart?)
+local function getHumanoidAndRoot(model: Model): (Humanoid?, BasePart?)
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	local rootPart = model:FindFirstChild("HumanoidRootPart")
 	if not rootPart or not rootPart:IsA("BasePart") then
@@ -20,7 +20,7 @@ function MonsterMovement.IsValidTarget(target: Model?, monster: Model): boolean
 		return false
 	end
 
-	local humanoid, rootPart = MonsterMovement.GetHumanoidAndRoot(target)
+	local humanoid, rootPart = getHumanoidAndRoot(target)
 	return humanoid ~= nil and rootPart ~= nil and humanoid.Health > 0
 end
 
@@ -31,7 +31,7 @@ function MonsterMovement.GetClosestTarget(monster: Model, monsterRoot: BasePart,
 
 	for _, candidate in ipairs(Workspace:GetChildren()) do
 		if candidate:IsA("Model") and candidate ~= monster then
-			local humanoid, rootPart = MonsterMovement.GetHumanoidAndRoot(candidate)
+			local humanoid, rootPart = getHumanoidAndRoot(candidate)
 			if humanoid and rootPart and humanoid.Health > 0 then
 				local distance = (monsterRoot.Position - rootPart.Position).Magnitude
 				if distance <= shortestDistance then

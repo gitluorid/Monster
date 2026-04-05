@@ -2,6 +2,13 @@ local Debris = game:GetService("Debris")
 local Workspace = game:GetService("Workspace")
 
 local MonsterVisual = {}
+local fxFolder = script.Parent
+if not fxFolder then
+	error("MonsterVisual must be parented under fx")
+end
+local animationsFolder = fxFolder:WaitForChild("Animations")
+local objectsFolder = fxFolder:WaitForChild("Objects")
+local DEFAULT_EFFECT_LIFETIME = 5
 
 local function playAnimation(animationTemplate: Animation, model: Model): AnimationTrack?
 	if not animationTemplate or not model then
@@ -49,7 +56,8 @@ local function emitParticles(root: Instance)
 	end
 end
 
-local function placeTemplateAtOrigin(template: Instance, origin: CFrame): boolean
+local function placeTemplateAtOrigin(template: Instance, origin: CFrame, effectLifetime: number?): boolean
+	local lifetime = effectLifetime or DEFAULT_EFFECT_LIFETIME
 	if template:IsA("Model") then
 		local clone = template:Clone()
 		clone.Parent = Workspace
@@ -58,7 +66,7 @@ local function placeTemplateAtOrigin(template: Instance, origin: CFrame): boolea
 			clone:PivotTo(origin)
 		end
 		emitParticles(clone)
-		Debris:AddItem(clone, 5)
+		Debris:AddItem(clone, lifetime)
 		return true
 	end
 
@@ -67,7 +75,7 @@ local function placeTemplateAtOrigin(template: Instance, origin: CFrame): boolea
 		clone.CFrame = origin
 		clone.Parent = Workspace
 		emitParticles(clone)
-		Debris:AddItem(clone, 5)
+		Debris:AddItem(clone, lifetime)
 		return true
 	end
 
@@ -86,16 +94,11 @@ local function placeTemplateAtOrigin(template: Instance, origin: CFrame): boolea
 	clone.Parent = anchor
 
 	emitParticles(anchor)
-	Debris:AddItem(anchor, 5)
+	Debris:AddItem(anchor, lifetime)
 	return true
 end
 
-local function tryPlayBloodTemplate(controller, bloodOrigin: CFrame): boolean
-	local objectsFolder = controller.ObjectsFolder
-	if not objectsFolder then
-		return false
-	end
-
+local function tryPlayBloodTemplate(bloodOrigin: CFrame, effectLifetime: number?): boolean
 	local bloodTemplate = objectsFolder:FindFirstChild("NeckBlood")
 		or objectsFolder:FindFirstChild("Blood")
 		or objectsFolder:FindFirstChildWhichIsA("Model")
@@ -106,11 +109,12 @@ local function tryPlayBloodTemplate(controller, bloodOrigin: CFrame): boolean
 		return false
 	end
 
-	return placeTemplateAtOrigin(bloodTemplate, bloodOrigin)
+	return placeTemplateAtOrigin(bloodTemplate, bloodOrigin, effectLifetime)
 end
 
 -- Spawns simple blood particles for visual feedback.
-function MonsterVisual.SpawnBlood(origin: CFrame, amount: number)
+function MonsterVisual.SpawnBlood(origin: CFrame, amount: number, effectLifetime: number?)
+	local lifetime = effectLifetime or DEFAULT_EFFECT_LIFETIME
 	task.spawn(function()
 		for _ = 1, amount do
 			local part = Instance.new("Part")
@@ -127,13 +131,14 @@ function MonsterVisual.SpawnBlood(origin: CFrame, amount: number)
 			velocity.Parent = part
 
 			Debris:AddItem(velocity, 0.2)
-			Debris:AddItem(part, 5)
+			Debris:AddItem(part, lifetime)
 		end
 	end)
 end
 
 -- Chooses blood origin from target head when available, then plays kill blood visual effects.
 function MonsterVisual.PlayKillBlood(controller, targetModel: Model, targetRoot: BasePart, amount: number)
+	local effectLifetime = controller.Config.Visual.EFFECT_LIFETIME
 	local targetHead = targetModel:FindFirstChild("Head")
 	local bloodOrigin = targetRoot.CFrame
 	if targetHead and targetHead:IsA("BasePart") then
@@ -141,14 +146,14 @@ function MonsterVisual.PlayKillBlood(controller, targetModel: Model, targetRoot:
 		targetHead:Destroy()
 	end
 
-	if not tryPlayBloodTemplate(controller, bloodOrigin) then
-		MonsterVisual.SpawnBlood(bloodOrigin, amount)
+	if not tryPlayBloodTemplate(bloodOrigin, effectLifetime) then
+		MonsterVisual.SpawnBlood(bloodOrigin, amount, effectLifetime)
 	end
 end
 
 -- Plays an animation by name and ensures only one animation track is active at a time.
 function MonsterVisual.PlayUniqueAnimation(controller, animationName: string): AnimationTrack?
-	local animation = controller.AnimationsFolder:FindFirstChild(animationName)
+	local animation = animationsFolder:FindFirstChild(animationName)
 	if not animation or not animation:IsA("Animation") then
 		return nil
 	end

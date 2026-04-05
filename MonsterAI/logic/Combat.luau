@@ -21,9 +21,10 @@ function MonsterCombat.PerformSwingAttack(
 	config,
 	lastAttackTime: number
 ): (boolean, number, Model?, BasePart?)
+	local combatConfig = config.Combat
 	-- Cooldown gate.
 	local now = os.clock()
-	if now - lastAttackTime < config.ATTACK_COOLDOWN then
+	if now - lastAttackTime < combatConfig.ATTACK_COOLDOWN then
 		return false, lastAttackTime, nil, nil
 	end
 
@@ -44,7 +45,7 @@ function MonsterCombat.PerformSwingAttack(
 	end
 
 	-- Wait for swing windup so the hit lands after the animation starts.
-	local hitDelay = config.ATTACK_SWING_HIT_DELAY or 0.7
+	local hitDelay = combatConfig.SWING_HIT_DELAY
 
 	-- Hold the full target rig by root so body/head stay together.
 	local leftHand = monster:FindFirstChild("Left Hand") or monster:FindFirstChild("LeftHand")
@@ -86,13 +87,13 @@ function MonsterCombat.PerformSwingAttack(
 
 	task.wait(0.01)
 
-	local leftForce = -monsterRoot.CFrame.RightVector * 100 -- Multiply by force amount
+	local leftForce = -monsterRoot.CFrame.RightVector * combatConfig.KNOCKBACK_FORCE
 	local bv = Instance.new("BodyVelocity")
 	bv.Velocity = leftForce
-	bv.Parent = targetModel.HumanoidRootPart
-	bv.P = 10000
-	bv.MaxForce = Vector3.new(10000, 10000, 10000)
-	Debris:AddItem(bv, 0.2)
+	bv.Parent = targetRoot
+	bv.P = combatConfig.KNOCKBACK_POWER
+	bv.MaxForce = Vector3.new(combatConfig.KNOCKBACK_POWER, combatConfig.KNOCKBACK_POWER, combatConfig.KNOCKBACK_POWER)
+	Debris:AddItem(bv, combatConfig.KNOCKBACK_DURATION)
 
 	if anchoredMonsterForSwing then
 		monsterRoot.Anchored = false

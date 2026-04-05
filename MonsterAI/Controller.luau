@@ -111,6 +111,85 @@ local function wanderStep(controller)
 	controller:_enterIdle(controller.Config.IDLE_AFTER_WANDER_TIME)
 end
 
+local function playAttackHitPresentation(controller, didAttack: boolean, attackedModel: Model?, attackedRoot: BasePart?)
+	if not didAttack or not attackedModel or not attackedRoot then
+		return
+	end
+
+	local headBlowSound = controller.Audio.FindSound(controller, "HeadBlow")
+	if headBlowSound and headBlowSound:IsA("Sound") then
+		controller.Audio.PlaySound(headBlowSound, controller.RootPart, 3)
+	end
+
+	controller.Visual.PlayKillBlood(controller, attackedModel, attackedRoot, controller.Config.BLOOD_PART_AMOUNT)
+end
+
+local function performMeleeAttack(controller, target: Model)
+	controller:_setState(MonsterStateMachine.States.Attack)
+	controller.Visual.PlayUniqueAnimation(controller, "Attack")
+
+	local attackSound = controller.Audio.FindSound(controller, "Attack")
+	if attackSound and attackSound:IsA("Sound") then
+		controller.Audio.PlaySound(attackSound, controller.RootPart, 4)
+	end
+
+	local didAttack, newLastAttack, attackedModel, attackedRoot = controller.Combat.PerformSwingAttack(
+		controller.Monster,
+		target,
+		controller.RootPart,
+		controller.Config,
+		controller._lastAttackTime
+	)
+	controller._lastAttackTime = newLastAttack
+
+	playAttackHitPresentation(controller, didAttack, attackedModel, attackedRoot)
+
+	controller:_setState(MonsterStateMachine.States.Chase)
+	task.wait(0.05)
+end
+
+local function tryHandleMeleeRange(controller, target: Model, distanceToTarget: number): boolean
+	if distanceToTarget > controller.Config.MELEE_RANGE then
+		return false
+	end
+
+	if os.clock() - controller._lastAttackTime < controller.Config.ATTACK_COOLDOWN then
+		task.wait(0.05)
+		return true
+	end
+
+	performMeleeAttack(controller, target)
+	return true
+end
+
+local function performChaseMoveStep(controller, targetRoot: BasePart)
+	local path = controller.Movement.ComputePath(
+		controller.Config.PATH_SETTINGS,
+		controller.RootPart.Position,
+		targetRoot.Position
+	)
+	local nextPosition = targetRoot.Position
+	if path then
+		nextPosition = controller.Movement.PickNextWaypoint(
+			path,
+			controller.RootPart,
+			controller.Config.WAYPOINT_MIN_DISTANCE,
+			targetRoot.Position
+		)
+	end
+
+	controller.Movement.MoveToPosition(
+		controller.Humanoid,
+		controller.RootPart,
+		nextPosition,
+		controller.Config.CHASE_WAYPOINT_REACHED_DISTANCE or controller.Config.WAYPOINT_REACHED_DISTANCE,
+		controller.Config.CHASE_MOVE_TIMEOUT or 0.4,
+		function()
+			controller.Audio.TryPlayFootstep(controller)
+		end
+	)
+end
+
 -- Chase loop: runs while target is valid and in range.
 local function chaseTarget(controller, target: Model)
 	controller:_setState(MonsterStateMachine.States.Chase)
@@ -138,73 +217,11 @@ local function chaseTarget(controller, target: Model)
 			return
 		end
 
-		if distanceToTarget <= controller.Config.MELEE_RANGE then
-			if os.clock() - controller._lastAttackTime < controller.Config.ATTACK_COOLDOWN then
-				task.wait(0.05)
-				continue
-			end
-
-			controller:_setState(MonsterStateMachine.States.Attack)
-			controller.Visual.PlayUniqueAnimation(controller, "Attack")
-
-			local attackSound = controller.Audio.FindSound(controller, "Attack")
-			if attackSound and attackSound:IsA("Sound") then
-				controller.Audio.PlaySound(attackSound, controller.RootPart, 4)
-			end
-
-			local didAttack, newLastAttack, attackedModel, attackedRoot = controller.Combat.PerformSwingAttack(
-				controller.Monster,
-				target,
-				controller.RootPart,
-				controller.Config,
-				controller._lastAttackTime
-			)
-			controller._lastAttackTime = newLastAttack
-
-			if didAttack and attackedModel and attackedRoot then
-				local headBlowSound = controller.Audio.FindSound(controller, "HeadBlow")
-				if headBlowSound and headBlowSound:IsA("Sound") then
-					controller.Audio.PlaySound(headBlowSound, controller.RootPart, 3)
-				end
-
-				controller.Visual.PlayKillBlood(
-					controller,
-					attackedModel,
-					attackedRoot,
-					controller.Config.BLOOD_PART_AMOUNT
-				)
-			end
-
-			controller:_setState(MonsterStateMachine.States.Chase)
-			task.wait(0.05)
+		if tryHandleMeleeRange(controller, target, distanceToTarget) then
 			continue
 		end
 
-		local path = controller.Movement.ComputePath(
-			controller.Config.PATH_SETTINGS,
-			controller.RootPart.Position,
-			targetRoot.Position
-		)
-		local nextPosition = targetRoot.Position
-		if path then
-			nextPosition = controller.Movement.PickNextWaypoint(
-				path,
-				controller.RootPart,
-				controller.Config.WAYPOINT_MIN_DISTANCE,
-				targetRoot.Position
-			)
-		end
-
-		controller.Movement.MoveToPosition(
-			controller.Humanoid,
-			controller.RootPart,
-			nextPosition,
-			controller.Config.CHASE_WAYPOINT_REACHED_DISTANCE or controller.Config.WAYPOINT_REACHED_DISTANCE,
-			controller.Config.CHASE_MOVE_TIMEOUT or 0.4,
-			function()
-				controller.Audio.TryPlayFootstep(controller)
-			end
-		)
+		performChaseMoveStep(controller, targetRoot)
 		task.wait()
 	end
 end

@@ -9,7 +9,7 @@ local Config = {
 	-- Core combat behavior and attack pacing.
 	Combat = {
 		-- Maximum distance where a target can be detected for chase.
-		DETECTION_RANGE = 500,
+		DETECTION_RANGE = 50,
 		-- Distance threshold to trigger melee attack behavior.
 		MELEE_RANGE = 15,
 		-- Minimum seconds between consecutive attacks.
@@ -59,7 +59,7 @@ local Config = {
 		-- Minimum random idle duration in seconds.
 		MIN_DURATION = 2.5,
 		-- Maximum random idle duration in seconds.
-		MAX_DURATION = 13,
+		MAX_DURATION = 12,
 		-- Loop tick interval while waiting in idle state.
 		TICK_INTERVAL = 0.05,
 	},

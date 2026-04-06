@@ -74,8 +74,9 @@ local function getRandomIdleDuration(config): number
 	if maxDuration < minDuration then
 		minDuration, maxDuration = maxDuration, minDuration
 	end
-
-	return minDuration + math.random() * (maxDuration - minDuration)
+	
+	local duration = minDuration + math.random() * (maxDuration - minDuration)
+	return duration
 end
 
 local function getTargetRootPart(target: Model?): BasePart?
@@ -269,7 +270,6 @@ local function wanderStep(controller): Model?
 		task.wait()
 	end
 
-	enterIdle(controller, getRandomIdleDuration(config))
 	return nil
 end
 

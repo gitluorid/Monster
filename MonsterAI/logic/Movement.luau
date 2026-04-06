@@ -75,7 +75,7 @@ function MonsterMovement.MoveToPosition(
 	position: Vector3,
 	closeDistance: number,
 	timeout: number,
-	onStep: (() -> ())?
+	onStep: (() -> boolean?)?
 ): boolean
 	humanoid:MoveTo(position)
 	local targetFlat = Vector3.new(position.X, 0, position.Z)
@@ -83,7 +83,10 @@ function MonsterMovement.MoveToPosition(
 	local startTime = os.clock()
 	while os.clock() - startTime <= timeout do
 		if onStep then
-			onStep()
+			if onStep() then
+				humanoid:MoveTo(rootPart.Position)
+				return false
+			end
 		end
 
 		local currentFlat = Vector3.new(rootPart.Position.X, 0, rootPart.Position.Z)

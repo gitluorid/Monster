@@ -78,6 +78,67 @@ local function getRandomIdleDuration(config): number
 	return minDuration + math.random() * (maxDuration - minDuration)
 end
 
+local function getTargetRootPart(target: Model?): BasePart?
+	if not target then
+		return nil
+	end
+
+	local rootPart = target:FindFirstChild("HumanoidRootPart")
+	if not rootPart or not rootPart:IsA("BasePart") then
+		return nil
+	end
+
+	return rootPart
+end
+
+local function getTargetingTuning(config): (number, number)
+	local targetingConfig = config.Targeting
+	local reevaluateInterval = 0.2
+	local switchDistanceDelta = 0
+
+	if targetingConfig then
+		reevaluateInterval = math.max(0.01, targetingConfig.REEVALUATE_INTERVAL or reevaluateInterval)
+		switchDistanceDelta = math.max(0, targetingConfig.SWITCH_DISTANCE_DELTA or switchDistanceDelta)
+	end
+
+	return reevaluateInterval, switchDistanceDelta
+end
+
+local function getPreferredTarget(controller, currentTarget: Model?): Model?
+	local config = controller.Config
+	local candidate =
+		controller.Movement.GetClosestTarget(controller.Monster, controller.RootPart, config.Combat.DETECTION_RANGE)
+	if not candidate then
+		return currentTarget
+	end
+
+	if not currentTarget or not controller.Movement.IsValidTarget(currentTarget, controller.Monster) then
+		return candidate
+	end
+
+	if candidate == currentTarget then
+		return currentTarget
+	end
+
+	local currentRoot = getTargetRootPart(currentTarget)
+	local candidateRoot = getTargetRootPart(candidate)
+	if not currentRoot then
+		return candidate
+	end
+	if not candidateRoot then
+		return currentTarget
+	end
+
+	local _, switchDistanceDelta = getTargetingTuning(config)
+	local currentDistance = (controller.RootPart.Position - currentRoot.Position).Magnitude
+	local candidateDistance = (controller.RootPart.Position - candidateRoot.Position).Magnitude
+	if candidateDistance + switchDistanceDelta < currentDistance then
+		return candidate
+	end
+
+	return currentTarget
+end
+
 -- Runs idle state for a duration.
 local function enterIdle(controller, duration: number)
 	local config = controller.Config
@@ -118,14 +179,33 @@ end
 -- 1) Enter wander state
 -- 2) Pick one random goal
 -- 3) Repath in short waypoint steps toward that goal
--- 4) Return to idle
-local function wanderStep(controller)
+-- 4) Return to idle unless interrupted by a detected target
+local function wanderStep(controller): Model?
 	local config = controller.Config
 	controller.StateMachine:SetState(MonsterStateMachine.States.Wander)
 	controller.Audio.SetFootstepInterval(controller, config.Audio.Footsteps.WANDER_INTERVAL)
 	setTargetWalkSpeed(controller, config.MovementSpeeds.WANDER)
 	controller.Visual.PlayUniqueAnimation(controller, "Walk")
 	updateWalkSpeed(controller)
+	local reevaluateInterval = getTargetingTuning(config)
+	local nextTargetCheckAt = 0
+	local detectedTarget: Model? = nil
+
+	local function tryFindTarget(now: number): boolean
+		if now < nextTargetCheckAt then
+			return false
+		end
+
+		nextTargetCheckAt = now + reevaluateInterval
+		local candidate = getPreferredTarget(controller, nil)
+		if not candidate then
+			return false
+		end
+
+		detectedTarget = candidate
+		return true
+	end
+
 	local wanderStartTime = os.clock()
 	local wanderGoal, goalDistance = chooseWanderGoal(controller)
 	local wanderSpeed = math.max(0.1, config.MovementSpeeds.WANDER)
@@ -133,6 +213,10 @@ local function wanderStep(controller)
 
 	while controller._running and controller.Humanoid.Health > 0 do
 		local elapsed = os.clock() - wanderStartTime
+		if tryFindTarget(os.clock()) then
+			return detectedTarget
+		end
+
 		if elapsed >= wanderTimeBudget then
 			break
 		end
@@ -166,8 +250,17 @@ local function wanderStep(controller)
 			function()
 				updateWalkSpeed(controller)
 				controller.Audio.TryPlayFootstep(controller)
+				if tryFindTarget(os.clock()) then
+					return true
+				end
+
+				return false
 			end
 		)
+
+		if detectedTarget then
+			return detectedTarget
+		end
 
 		if (controller.RootPart.Position - wanderGoal).Magnitude <= config.Wander.REACHED_DISTANCE then
 			break
@@ -177,6 +270,7 @@ local function wanderStep(controller)
 	end
 
 	enterIdle(controller, getRandomIdleDuration(config))
+	return nil
 end
 
 local function playAttackHitPresentation(controller, didAttack: boolean, attackedModel: Model?, attackedRoot: BasePart?)
@@ -304,6 +398,8 @@ end
 local function chaseTarget(controller, target: Model)
 	local config = controller.Config
 	local combatConfig = config.Combat
+	local reevaluateInterval = getTargetingTuning(config)
+	local lastReevaluateAt = 0
 	controller.StateMachine:SetState(MonsterStateMachine.States.Chase)
 	controller.Audio.SetFootstepInterval(controller, config.Audio.Footsteps.CHASE_INTERVAL)
 	setTargetWalkSpeed(controller, config.MovementSpeeds.CHASE)
@@ -321,9 +417,17 @@ local function chaseTarget(controller, target: Model)
 
 	while controller._running and controller.Movement.IsValidTarget(target, controller.Monster) do
 		updateWalkSpeed(controller)
+		local now = os.clock()
+		if now - lastReevaluateAt >= reevaluateInterval then
+			lastReevaluateAt = now
+			local preferredTarget = getPreferredTarget(controller, target)
+			if preferredTarget and preferredTarget ~= target then
+				target = preferredTarget
+			end
+		end
 
-		local targetRoot = target:FindFirstChild("HumanoidRootPart")
-		if not targetRoot or not targetRoot:IsA("BasePart") then
+		local targetRoot = getTargetRootPart(target)
+		if not targetRoot then
 			return
 		end
 
@@ -363,7 +467,10 @@ local function start(controller)
 			if not controller._running or controller.Humanoid.Health <= 0 then
 				break
 			end
-			wanderStep(controller)
+			local wanderTarget = wanderStep(controller)
+			if wanderTarget then
+				chaseTarget(controller, wanderTarget)
+			end
 		end
 
 		task.wait(config.Loop.MAIN_TICK_INTERVAL)

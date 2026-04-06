@@ -28,6 +28,14 @@ local Config = {
 		KNOCKBACK_DURATION = 0.2,
 	},
 
+	-- Target re-acquisition behavior while wandering/chasing.
+	Targeting = {
+		-- Seconds between nearest-target checks while moving.
+		REEVALUATE_INTERVAL = 0.75,
+		-- New candidate must be this much closer before switching chase target.
+		SWITCH_DISTANCE_DELTA = 8,
+	},
+
 	-- Raw walk speeds for each locomotion mode.
 	MovementSpeeds = {
 		-- WalkSpeed while roaming without a target.

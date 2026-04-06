@@ -96,8 +96,11 @@ function MonsterCombat.PerformSwingAttack(
 	Debris:AddItem(bv, combatConfig.KNOCKBACK_DURATION)
 
 	if anchoredMonsterForSwing then
+		monsterRoot.AssemblyLinearVelocity = Vector3.zero
+		monsterRoot.AssemblyAngularVelocity = Vector3.zero
 		monsterRoot.Anchored = false
 	end
+
 	return true, now, targetModel, targetRoot
 end
 return MonsterCombat

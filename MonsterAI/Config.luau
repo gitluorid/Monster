@@ -9,7 +9,7 @@ local Config = {
 	-- Core combat behavior and attack pacing.
 	Combat = {
 		-- Maximum distance where a target can be detected for chase.
-		DETECTION_RANGE = 200,
+		DETECTION_RANGE = 500,
 		-- Distance threshold to trigger melee attack behavior.
 		MELEE_RANGE = 15,
 		-- Minimum seconds between consecutive attacks.
@@ -33,15 +33,25 @@ local Config = {
 		-- WalkSpeed while roaming without a target.
 		WANDER = 18,
 		-- WalkSpeed while actively chasing a target.
-		CHASE = 26,
+		CHASE = 50,
+	},
+
+	-- WalkSpeed smoothing used when transitioning between states.
+	MovementTransition = {
+		-- WalkSpeed units per second while speeding up.
+		ACCELERATION = 35,
+		-- WalkSpeed units per second while slowing down.
+		DECELERATION = 50,
+		-- Snap directly when this close to target speed.
+		SNAP_DISTANCE = 0.05,
 	},
 
 	-- Idle pacing around wander actions.
 	Idle = {
 		-- Minimum random idle duration in seconds.
-		MIN_DURATION = 0.25,
+		MIN_DURATION = 2.5,
 		-- Maximum random idle duration in seconds.
-		MAX_DURATION = 5,
+		MAX_DURATION = 13,
 		-- Loop tick interval while waiting in idle state.
 		TICK_INTERVAL = 0.05,
 	},
@@ -71,9 +81,9 @@ local Config = {
 		-- Minimum distance to consider a waypoint meaningfully ahead.
 		MIN_WAYPOINT_DISTANCE = 15,
 		-- Close-enough distance to consider chase MoveTo complete.
-		REACHED_DISTANCE = 2,
+		REACHED_DISTANCE = 5,
 		-- Maximum seconds to wait for one chase MoveTo step.
-		STEP_TIMEOUT = 0.15,
+		STEP_TIMEOUT = 0.01,
 	},
 
 	-- Pathfinding agent settings.
@@ -114,6 +124,28 @@ local Config = {
 		BLOOD_PART_AMOUNT = 60,
 		-- Lifetime in seconds for blood effect parts.
 		EFFECT_LIFETIME = 100,
+		-- Cross-fade and handoff timing for animation transitions.
+		AnimationTransitions = {
+			-- Fade-in duration when starting a new animation.
+			FADE_IN_TIME = 0.25,
+			-- Fade-out duration when stopping the current animation.
+			FADE_OUT_TIME = 0.5,
+			-- Max wait for attack animation tail before changing state.
+			MAX_ATTACK_HOLD = 5.0,
+			-- Start blending this many seconds before attack clip end.
+			ATTACK_END_EARLY_BLEND = 0.5,
+		},
+		-- Playback multipliers used to sync movement animation pace with WalkSpeed ramping.
+		AnimationSpeed = {
+			-- Run animation playback at low speed while chase acceleration starts.
+			RUN_MIN_MULTIPLIER = 0.1,
+			-- Run animation playback at full chase speed.
+			RUN_MAX_MULTIPLIER = 1.0,
+			-- Walk animation playback at low speed while wander acceleration starts.
+			WALK_MIN_MULTIPLIER = 0.65,
+			-- Walk animation playback at full wander speed.
+			WALK_MAX_MULTIPLIER = 1.0,
+		},
 	},
 
 	Loop = {

@@ -8,8 +8,79 @@ if not fxFolder then
 end
 local animationsFolder = fxFolder:WaitForChild("Animations")
 local DEFAULT_EFFECT_LIFETIME = 5
+local DEFAULT_ANIMATION_FADE_IN = 0.12
+local DEFAULT_ANIMATION_FADE_OUT = 0.16
+local DEFAULT_RUN_MIN_MULTIPLIER = 0.45
+local DEFAULT_RUN_MAX_MULTIPLIER = 1
+local DEFAULT_WALK_MIN_MULTIPLIER = 0.65
+local DEFAULT_WALK_MAX_MULTIPLIER = 1
 
-local function playAnimation(animationTemplate: Animation, model: Model): AnimationTrack?
+local function sanitizeFadeTime(value: any, fallback: number): number
+	if type(value) ~= "number" then
+		return fallback
+	end
+
+	return math.max(0, value)
+end
+
+local function getAnimationTransitionTimes(controller): (number, number)
+	local visualConfig = controller and controller.Config and controller.Config.Visual
+	local transitionConfig = visualConfig and visualConfig.AnimationTransitions
+	if not transitionConfig then
+		return DEFAULT_ANIMATION_FADE_IN, DEFAULT_ANIMATION_FADE_OUT
+	end
+
+	local fadeInTime = sanitizeFadeTime(transitionConfig.FADE_IN_TIME, DEFAULT_ANIMATION_FADE_IN)
+	local fadeOutTime = sanitizeFadeTime(transitionConfig.FADE_OUT_TIME, DEFAULT_ANIMATION_FADE_OUT)
+
+	return fadeInTime, fadeOutTime
+end
+
+local function sanitizeSpeedMultiplier(value: any, fallback: number): number
+	if type(value) ~= "number" then
+		return fallback
+	end
+
+	return math.max(0.05, value)
+end
+
+local function getAnimationSpeedMapping(controller, animationName: string): (boolean, number, number, number)
+	local movementSpeeds = controller and controller.Config and controller.Config.MovementSpeeds
+	if not movementSpeeds then
+		return false, 0, 0, 1
+	end
+
+	local visualConfig = controller and controller.Config and controller.Config.Visual
+	local speedConfig = visualConfig and visualConfig.AnimationSpeed
+
+	if animationName == "Run" then
+		local minMultiplier =
+			sanitizeSpeedMultiplier(speedConfig and speedConfig.RUN_MIN_MULTIPLIER, DEFAULT_RUN_MIN_MULTIPLIER)
+		local maxMultiplier =
+			sanitizeSpeedMultiplier(speedConfig and speedConfig.RUN_MAX_MULTIPLIER, DEFAULT_RUN_MAX_MULTIPLIER)
+		if maxMultiplier < minMultiplier then
+			minMultiplier, maxMultiplier = maxMultiplier, minMultiplier
+		end
+
+		return true, minMultiplier, maxMultiplier, math.max(0.01, movementSpeeds.CHASE or 0)
+	end
+
+	if animationName == "Walk" then
+		local minMultiplier =
+			sanitizeSpeedMultiplier(speedConfig and speedConfig.WALK_MIN_MULTIPLIER, DEFAULT_WALK_MIN_MULTIPLIER)
+		local maxMultiplier =
+			sanitizeSpeedMultiplier(speedConfig and speedConfig.WALK_MAX_MULTIPLIER, DEFAULT_WALK_MAX_MULTIPLIER)
+		if maxMultiplier < minMultiplier then
+			minMultiplier, maxMultiplier = maxMultiplier, minMultiplier
+		end
+
+		return true, minMultiplier, maxMultiplier, math.max(0.01, movementSpeeds.WANDER or 0)
+	end
+
+	return false, 0, 0, 1
+end
+
+local function playAnimation(animationTemplate: Animation, model: Model, fadeInTime: number?): AnimationTrack?
 	if not animationTemplate or not model then
 		return nil
 	end
@@ -29,7 +100,7 @@ local function playAnimation(animationTemplate: Animation, model: Model): Animat
 	animationClone.Parent = model
 
 	local animationTrack = animator:LoadAnimation(animationClone)
-	animationTrack:Play()
+	animationTrack:Play(math.max(0, fadeInTime or 0))
 
 	animationTrack.Stopped:Connect(function()
 		if animationClone.Parent then
@@ -40,9 +111,9 @@ local function playAnimation(animationTemplate: Animation, model: Model): Animat
 	return animationTrack
 end
 
-local function stopAnimation(animationTrack: AnimationTrack?)
+local function stopAnimation(animationTrack: AnimationTrack?, fadeOutTime: number?)
 	if animationTrack then
-		animationTrack:Stop()
+		animationTrack:Stop(math.max(0, fadeOutTime or 0))
 	end
 end
 
@@ -90,6 +161,8 @@ function MonsterVisual.PlayUniqueAnimation(controller, animationName: string): A
 		return nil
 	end
 
+	local fadeInTime, fadeOutTime = getAnimationTransitionTimes(controller)
+
 	if
 		controller._visualCurrentAnimationTrack
 		and controller._visualCurrentAnimationTrack.IsPlaying
@@ -99,15 +172,43 @@ function MonsterVisual.PlayUniqueAnimation(controller, animationName: string): A
 	end
 
 	if controller._visualCurrentAnimationTrack then
-		stopAnimation(controller._visualCurrentAnimationTrack)
+		stopAnimation(controller._visualCurrentAnimationTrack, fadeOutTime)
 		controller._visualCurrentAnimationTrack = nil
 		controller._visualCurrentAnimationName = nil
 	end
 
-	controller._visualCurrentAnimationTrack = playAnimation(animation, controller.Monster)
+	controller._visualCurrentAnimationTrack = playAnimation(animation, controller.Monster, fadeInTime)
 	controller._visualCurrentAnimationName = animation.Name
+	MonsterVisual.UpdateMovementAnimationSpeed(controller)
 
 	return controller._visualCurrentAnimationTrack
+end
+
+-- Adjusts locomotion animation playback speed so visual pace matches current WalkSpeed ramping.
+function MonsterVisual.UpdateMovementAnimationSpeed(controller)
+	local currentTrack = controller._visualCurrentAnimationTrack
+	if not currentTrack or not currentTrack.IsPlaying then
+		return
+	end
+
+	local currentName = controller._visualCurrentAnimationName
+	if not currentName then
+		return
+	end
+
+	local hasMapping, minMultiplier, maxMultiplier, referenceWalkSpeed =
+		getAnimationSpeedMapping(controller, currentName)
+	if not hasMapping then
+		return
+	end
+	local currentWalkSpeed = 0
+	if controller.Humanoid then
+		currentWalkSpeed = math.max(0, controller.Humanoid.WalkSpeed)
+	end
+
+	local alpha = math.clamp(currentWalkSpeed / referenceWalkSpeed, 0, 1)
+	local playbackSpeed = minMultiplier + ((maxMultiplier - minMultiplier) * alpha)
+	currentTrack:AdjustSpeed(playbackSpeed)
 end
 
 -- Tries to play idle animation.
@@ -118,9 +219,11 @@ function MonsterVisual.PlayIdleAnimation(controller): AnimationTrack?
 		return idleTrack
 	end
 
+	local _, fadeOutTime = getAnimationTransitionTimes(controller)
+
 	-- If there is no idle animation asset, stop motion animation so the monster visually idles.
 	if controller._visualCurrentAnimationTrack then
-		stopAnimation(controller._visualCurrentAnimationTrack)
+		stopAnimation(controller._visualCurrentAnimationTrack, fadeOutTime)
 		controller._visualCurrentAnimationTrack = nil
 		controller._visualCurrentAnimationName = nil
 	end
@@ -140,9 +243,10 @@ end
 -- Stops visuals and active animation track.
 function MonsterVisual.Stop(controller)
 	controller._visualRunning = false
+	local _, fadeOutTime = getAnimationTransitionTimes(controller)
 
 	if controller._visualCurrentAnimationTrack then
-		stopAnimation(controller._visualCurrentAnimationTrack)
+		stopAnimation(controller._visualCurrentAnimationTrack, fadeOutTime)
 		controller._visualCurrentAnimationTrack = nil
 		controller._visualCurrentAnimationName = nil
 	end

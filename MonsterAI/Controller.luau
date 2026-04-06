@@ -13,6 +13,60 @@ local MonsterStateMachine = require(logicFolder:WaitForChild("StateMachine") :: 
 local MonsterVisual = require(fxFolder:WaitForChild("Visual") :: ModuleScript)
 local MonsterAudio = require(fxFolder:WaitForChild("Audio") :: ModuleScript)
 
+local function setTargetWalkSpeed(controller, speed: number)
+	controller._movementTargetWalkSpeed = math.max(0, speed)
+	controller._movementLastUpdateAt = os.clock()
+end
+
+local function updateMovementAnimationSpeed(controller)
+	if controller.Visual and controller.Visual.UpdateMovementAnimationSpeed then
+		controller.Visual.UpdateMovementAnimationSpeed(controller)
+	end
+end
+
+local function updateWalkSpeed(controller)
+	local targetSpeed = controller._movementTargetWalkSpeed
+	if targetSpeed == nil then
+		updateMovementAnimationSpeed(controller)
+		return
+	end
+
+	local now = os.clock()
+	local dt = now - controller._movementLastUpdateAt
+	controller._movementLastUpdateAt = now
+
+	if dt <= 0 then
+		updateMovementAnimationSpeed(controller)
+		return
+	end
+
+	local transitionConfig = controller.Config.MovementTransition
+	local currentSpeed = controller.Humanoid.WalkSpeed
+	local speedDelta = targetSpeed - currentSpeed
+	local distanceToTarget = math.abs(speedDelta)
+	if distanceToTarget <= transitionConfig.SNAP_DISTANCE then
+		controller.Humanoid.WalkSpeed = targetSpeed
+		updateMovementAnimationSpeed(controller)
+		return
+	end
+
+	local ratePerSecond = transitionConfig.ACCELERATION
+	if speedDelta < 0 then
+		ratePerSecond = transitionConfig.DECELERATION
+	end
+
+	local stepAmount = math.max(0, ratePerSecond) * dt
+	if stepAmount >= distanceToTarget then
+		controller.Humanoid.WalkSpeed = targetSpeed
+		updateMovementAnimationSpeed(controller)
+		return
+	end
+
+	local direction = if speedDelta > 0 then 1 else -1
+	controller.Humanoid.WalkSpeed = currentSpeed + (direction * stepAmount)
+	updateMovementAnimationSpeed(controller)
+end
+
 local function getRandomIdleDuration(config): number
 	local minDuration = config.Idle.MIN_DURATION
 	local maxDuration = config.Idle.MAX_DURATION
@@ -28,6 +82,7 @@ end
 local function enterIdle(controller, duration: number)
 	local config = controller.Config
 	controller.StateMachine:SetState(MonsterStateMachine.States.Idle)
+	setTargetWalkSpeed(controller, 0)
 	controller.Humanoid.WalkSpeed = 0
 	controller.Humanoid:Move(Vector3.zero)
 	controller.Audio.SetFootstepInterval(controller, config.Audio.Footsteps.WANDER_INTERVAL)
@@ -40,6 +95,7 @@ local function enterIdle(controller, duration: number)
 		and controller.Humanoid.Health > 0
 		and os.clock() < endTime
 	do
+		updateWalkSpeed(controller)
 		task.wait(config.Idle.TICK_INTERVAL)
 	end
 end
@@ -67,8 +123,9 @@ local function wanderStep(controller)
 	local config = controller.Config
 	controller.StateMachine:SetState(MonsterStateMachine.States.Wander)
 	controller.Audio.SetFootstepInterval(controller, config.Audio.Footsteps.WANDER_INTERVAL)
-	controller.Humanoid.WalkSpeed = config.MovementSpeeds.WANDER
+	setTargetWalkSpeed(controller, config.MovementSpeeds.WANDER)
 	controller.Visual.PlayUniqueAnimation(controller, "Walk")
+	updateWalkSpeed(controller)
 	local wanderStartTime = os.clock()
 	local wanderGoal, goalDistance = chooseWanderGoal(controller)
 	local wanderSpeed = math.max(0.1, config.MovementSpeeds.WANDER)
@@ -82,6 +139,7 @@ local function wanderStep(controller)
 
 		local path = controller.Movement.ComputePath(config.Path, controller.RootPart.Position, wanderGoal)
 		if not path then
+			updateWalkSpeed(controller)
 			task.wait(config.Wander.PATH_FAIL_RETRY_DELAY)
 			continue
 		end
@@ -106,6 +164,7 @@ local function wanderStep(controller)
 			config.Wander.REACHED_DISTANCE,
 			stepTimeout,
 			function()
+				updateWalkSpeed(controller)
 				controller.Audio.TryPlayFootstep(controller)
 			end
 		)
@@ -138,10 +197,39 @@ local function playAttackHitPresentation(controller, didAttack: boolean, attacke
 	)
 end
 
+local function waitForAttackAnimationHandoff(controller, attackTrack: AnimationTrack?)
+	local visualConfig = controller.Config.Visual
+	local transitionConfig = visualConfig and visualConfig.AnimationTransitions
+	if not transitionConfig then
+		return
+	end
+
+	local maxHold = math.max(0, transitionConfig.MAX_ATTACK_HOLD or 0)
+	if maxHold <= 0 then
+		return
+	end
+
+	if not attackTrack or attackTrack.Length <= 0 then
+		return
+	end
+
+	local earlyBlend = math.max(0, transitionConfig.ATTACK_END_EARLY_BLEND or 0)
+	local remainingTime = math.max(0, attackTrack.Length - attackTrack.TimePosition - earlyBlend)
+	local waitDuration = math.min(remainingTime, maxHold)
+	if waitDuration > 0 then
+		task.wait(waitDuration)
+	end
+end
+
 local function performMeleeAttack(controller, target: Model)
 	local config = controller.Config
+	setTargetWalkSpeed(controller, 0)
+	controller.Humanoid.WalkSpeed = 0
+	controller.Humanoid:Move(Vector3.zero)
+	controller.Humanoid:MoveTo(controller.RootPart.Position)
+	updateMovementAnimationSpeed(controller)
 	controller.StateMachine:SetState(MonsterStateMachine.States.Attack)
-	controller.Visual.PlayUniqueAnimation(controller, "Attack")
+	local attackTrack = controller.Visual.PlayUniqueAnimation(controller, "Attack")
 
 	local attackSound = controller.Audio.FindSound("Attack")
 	if attackSound and attackSound:IsA("Sound") then
@@ -158,8 +246,15 @@ local function performMeleeAttack(controller, target: Model)
 	controller._lastAttackTime = newLastAttack
 
 	playAttackHitPresentation(controller, didAttack, attackedModel, attackedRoot)
+	waitForAttackAnimationHandoff(controller, attackTrack)
 
 	controller.StateMachine:SetState(MonsterStateMachine.States.Chase)
+	local targetHumanoid = target:FindFirstChildOfClass("Humanoid")
+	if targetHumanoid and targetHumanoid.Health > 0 then
+		setTargetWalkSpeed(controller, config.MovementSpeeds.CHASE)
+	else
+		setTargetWalkSpeed(controller, 0)
+	end
 	task.wait(config.Combat.POST_ATTACK_RECOVERY_TIME)
 end
 
@@ -199,6 +294,7 @@ local function performChaseMoveStep(controller, targetRoot: BasePart)
 		chaseConfig.REACHED_DISTANCE,
 		chaseConfig.STEP_TIMEOUT,
 		function()
+			updateWalkSpeed(controller)
 			controller.Audio.TryPlayFootstep(controller)
 		end
 	)
@@ -210,8 +306,9 @@ local function chaseTarget(controller, target: Model)
 	local combatConfig = config.Combat
 	controller.StateMachine:SetState(MonsterStateMachine.States.Chase)
 	controller.Audio.SetFootstepInterval(controller, config.Audio.Footsteps.CHASE_INTERVAL)
-	controller.Humanoid.WalkSpeed = config.MovementSpeeds.CHASE
+	setTargetWalkSpeed(controller, config.MovementSpeeds.CHASE)
 	controller.Visual.PlayUniqueAnimation(controller, "Run")
+	updateWalkSpeed(controller)
 
 	local startChaseSound = controller.Audio.FindSound("StartChaseSound")
 	if startChaseSound then
@@ -223,9 +320,7 @@ local function chaseTarget(controller, target: Model)
 	--remote:FireClient(targetPlayer)
 
 	while controller._running and controller.Movement.IsValidTarget(target, controller.Monster) do
-		if controller.Humanoid.WalkSpeed ~= config.MovementSpeeds.CHASE then
-			controller.Humanoid.WalkSpeed = config.MovementSpeeds.CHASE
-		end
+		updateWalkSpeed(controller)
 
 		local targetRoot = target:FindFirstChild("HumanoidRootPart")
 		if not targetRoot or not targetRoot:IsA("BasePart") then
@@ -315,6 +410,8 @@ function MonsterController.new(monster: Model)
 		_audioRunning = false,
 		_audioFootstepInterval = MonsterConfig.Audio.Footsteps.WANDER_INTERVAL,
 		_audioLastFootstepAt = 0,
+		_movementTargetWalkSpeed = humanoid.WalkSpeed,
+		_movementLastUpdateAt = os.clock(),
 
 		Start = start,
 		Stop = stop,

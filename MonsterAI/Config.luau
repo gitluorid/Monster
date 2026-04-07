@@ -9,13 +9,15 @@ local Config = {
 	-- Core combat behavior and attack pacing.
 	Combat = {
 		-- Maximum distance where a target can be detected for chase.
-		DETECTION_RANGE = 50,
+		DETECTION_RANGE = 200,
 		-- Distance threshold to trigger melee attack behavior.
 		MELEE_RANGE = 15,
+		--Distance to stare.
+		STARE_RANGE = 100,
 		-- Minimum seconds between consecutive attacks.
 		ATTACK_COOLDOWN = 1.2,
 		-- Delay from attack start to when damage is applied.
-		SWING_HIT_DELAY = 0.7,
+		SWING_HIT_DELAY = 1.5,
 		-- Retry delay while waiting for attack cooldown.
 		COOLDOWN_RETRY_TIME = 0.05,
 		-- Recovery delay after an attack finishes.
@@ -42,6 +44,8 @@ local Config = {
 		WANDER = 18,
 		-- WalkSpeed while actively chasing a target.
 		CHASE = 50,
+		--WalkSpeed while stalking (0).
+		STARE = 0,
 	},
 
 	-- WalkSpeed smoothing used when transitioning between states.

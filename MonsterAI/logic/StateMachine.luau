@@ -6,6 +6,7 @@ MonsterStateMachine.States = {
 	Wander = "Wander",
 	Chase = "Chase",
 	Attack = "Attack",
+	Stare = "Stare",
 }
 
 -- Creates a tiny state machine object with 3 methods:

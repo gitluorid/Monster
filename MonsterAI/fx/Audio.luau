@@ -42,6 +42,20 @@ function MonsterAudio.FindSound(soundName: string): Sound?
 	return nil
 end
 
+function MonsterAudio.PlayNamed(controller, soundName: string, cleanUpTime: number?, soundParent: Instance?): Sound?
+	local soundTemplate = MonsterAudio.FindSound(soundName)
+	if not soundTemplate then
+		return nil
+	end
+
+	local parent = soundParent or controller.RootPart
+	if not parent then
+		return nil
+	end
+
+	return MonsterAudio.PlaySound(soundTemplate, parent, cleanUpTime)
+end
+
 function MonsterAudio.SetFootstepInterval(controller, interval: number)
 	controller._audioFootstepInterval = interval
 end
@@ -138,7 +152,7 @@ function MonsterAudio.Start(controller)
 	end
 
 	controller._audioRunning = true
-	startWanderSoundLoop(controller)
+	-- startWanderSoundLoop(controller)  -- Commented out to stop ambient whistling
 end
 
 function MonsterAudio.Stop(controller)

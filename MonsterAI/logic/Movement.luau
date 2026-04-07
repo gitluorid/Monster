@@ -14,6 +14,64 @@ local function getHumanoidAndRoot(model: Model): (Humanoid?, BasePart?)
 	return humanoid, rootPart
 end
 
+-- Sets desired walk speed used by the transition stepper.
+function MonsterMovement.SetWalkSpeedTarget(controller, speed: number)
+	controller._movementTargetWalkSpeed = math.max(0, speed)
+	controller._movementLastUpdateAt = os.clock()
+end
+
+-- Steps WalkSpeed toward target using configured acceleration/deceleration values.
+function MonsterMovement.StepWalkSpeedTransition(controller)
+	local targetSpeed = controller._movementTargetWalkSpeed
+	if targetSpeed == nil then
+		controller.Visual.UpdateMovementAnimationSpeed(controller)
+		return
+	end
+
+	local now = os.clock()
+	local dt = now - controller._movementLastUpdateAt
+	controller._movementLastUpdateAt = now
+
+	if dt <= 0 then
+		controller.Visual.UpdateMovementAnimationSpeed(controller)
+		return
+	end
+
+	local transitionConfig = controller.Config.MovementTransition
+	local currentSpeed = controller.Humanoid.WalkSpeed
+	local speedDelta = targetSpeed - currentSpeed
+	local distanceToTarget = math.abs(speedDelta)
+	if distanceToTarget <= transitionConfig.SNAP_DISTANCE then
+		controller.Humanoid.WalkSpeed = targetSpeed
+		controller.Visual.UpdateMovementAnimationSpeed(controller)
+		return
+	end
+
+	local ratePerSecond = transitionConfig.ACCELERATION
+	if speedDelta < 0 then
+		ratePerSecond = transitionConfig.DECELERATION
+	end
+
+	local stepAmount = math.max(0, ratePerSecond) * dt
+	if stepAmount >= distanceToTarget then
+		controller.Humanoid.WalkSpeed = targetSpeed
+		controller.Visual.UpdateMovementAnimationSpeed(controller)
+		return
+	end
+
+	local direction = if speedDelta > 0 then 1 else -1
+	controller.Humanoid.WalkSpeed = currentSpeed + (direction * stepAmount)
+	controller.Visual.UpdateMovementAnimationSpeed(controller)
+end
+
+-- Stops movement immediately while keeping animation speed in sync.
+function MonsterMovement.StopImmediately(controller)
+	MonsterMovement.SetWalkSpeedTarget(controller, 0)
+	controller.Humanoid.WalkSpeed = 0
+	controller.Humanoid:Move(Vector3.zero)
+	controller.Visual.UpdateMovementAnimationSpeed(controller)
+end
+
 -- Valid target = exists, not the monster itself, still in workspace, alive, and has root part.
 function MonsterMovement.IsValidTarget(target: Model?, monster: Model): boolean
 	if not target or target == monster or not target.Parent then

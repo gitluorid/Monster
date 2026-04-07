@@ -154,6 +154,20 @@ function MonsterVisual.PlayKillBloodEffect(controller, targetModel: Model, targe
 	MonsterVisual.SpawnBlood(bloodOrigin, amount, effectLifetime)
 end
 
+-- Plays the attack hit visual presentation when a swing lands.
+function MonsterVisual.PlayAttackHitPresentation(controller, attackedModel: Model?, attackedRoot: BasePart?)
+	if not attackedModel or not attackedRoot then
+		return
+	end
+
+	MonsterVisual.PlayKillBloodEffect(
+		controller,
+		attackedModel,
+		attackedRoot,
+		controller.Config.Visual.BLOOD_PART_AMOUNT
+	)
+end
+
 -- Plays an animation by name and ensures only one animation track is active at a time.
 function MonsterVisual.PlayUniqueAnimation(controller, animationName: string): AnimationTrack?
 	local animation = animationsFolder:FindFirstChild(animationName)
@@ -229,6 +243,31 @@ function MonsterVisual.PlayIdleAnimation(controller): AnimationTrack?
 	end
 
 	return nil
+end
+
+-- Waits a short duration near the tail of the attack animation before handoff.
+function MonsterVisual.WaitForAttackAnimationHandoff(controller, attackTrack: AnimationTrack?)
+	local visualConfig = controller.Config.Visual
+	local transitionConfig = visualConfig and visualConfig.AnimationTransitions
+	if not transitionConfig then
+		return
+	end
+
+	local maxHold = math.max(0, transitionConfig.MAX_ATTACK_HOLD or 0)
+	if maxHold <= 0 then
+		return
+	end
+
+	if not attackTrack or attackTrack.Length <= 0 then
+		return
+	end
+
+	local earlyBlend = math.max(0, transitionConfig.ATTACK_END_EARLY_BLEND or 0)
+	local remainingTime = math.max(0, attackTrack.Length - attackTrack.TimePosition - earlyBlend)
+	local waitDuration = math.min(remainingTime, maxHold)
+	if waitDuration > 0 then
+		task.wait(waitDuration)
+	end
 end
 
 -- Starts visual subsystem for this monster.

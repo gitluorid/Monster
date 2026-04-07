@@ -10,6 +10,7 @@ local MonsterStateMachine = require(logicFolder:WaitForChild("StateMachine") :: 
 local MonsterVisual = require(fxFolder:WaitForChild("Visual") :: ModuleScript)
 local MonsterAudio = require(fxFolder:WaitForChild("Audio") :: ModuleScript)
 
+-- Returns a random idle duration between the configured minimum and maximum.
 local function getRandomIdleDuration(config): number
 	local minDuration = config.Idle.MIN_DURATION
 	local maxDuration = config.Idle.MAX_DURATION
@@ -22,6 +23,7 @@ local function getRandomIdleDuration(config): number
 	return duration
 end
 
+-- Returns the HumanoidRootPart of a target if valid, otherwise nil.
 local function getTargetRootPart(target: Model?): BasePart?
 	if not target then
 		return nil
@@ -35,6 +37,7 @@ local function getTargetRootPart(target: Model?): BasePart?
 	return rootPart
 end
 
+-- Returns the configured target re-evaluation interval and switch distance delta.
 local function getTargetSelectionTuning(config): (number, number)
 	local targetingConfig = config.Targeting
 	local reevaluateInterval = 0.2
@@ -48,6 +51,7 @@ local function getTargetSelectionTuning(config): (number, number)
 	return reevaluateInterval, switchDistanceDelta
 end
 
+-- Chooses the preferred target based on current target validity and proximity.
 local function getPreferredTarget(controller, currentTarget: Model?): Model?
 	local config = controller.Config
 	local candidate =
@@ -214,6 +218,7 @@ local function runWanderStep(controller): Model?
 	return nil
 end
 
+-- Executes the full melee attack flow against a target, including animation and damage presentation.
 local function performMeleeAttack(controller, target: Model)
 	local config = controller.Config
 	controller.Movement.StopImmediately(controller)
@@ -246,6 +251,7 @@ local function performMeleeAttack(controller, target: Model)
 	task.wait(config.Combat.POST_ATTACK_RECOVERY_TIME)
 end
 
+-- Determines whether to engage a melee target now or wait for cooldown.
 local function handleMeleeEngagement(controller, target: Model, distanceToTarget: number): boolean
 	local combatConfig = controller.Config.Combat
 	if distanceToTarget > combatConfig.MELEE_RANGE then
@@ -261,6 +267,7 @@ local function handleMeleeEngagement(controller, target: Model, distanceToTarget
 	return true
 end
 
+-- Calculates and executes one movement step while chasing the target.
 local function performChaseMoveStep(controller, targetRoot: BasePart)
 	local chaseConfig = controller.Config.Chase
 	local pathConfig = controller.Config.Path
@@ -380,7 +387,7 @@ local function stopControllerLoop(controller)
 	controller.StateMachine:SetState(MonsterStateMachine.States.Idle)
 end
 
--- Creates one controller for one monster model.
+-- Creates and initializes a new monster controller instance for the given monster model.
 function MonsterController.new(monster: Model)
 	local humanoid = monster:FindFirstChildOfClass("Humanoid")
 	local rootPart = monster:FindFirstChild("HumanoidRootPart")

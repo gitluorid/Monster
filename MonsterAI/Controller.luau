@@ -51,6 +51,13 @@ local function getTargetSelectionTuning(config): (number, number)
 	return reevaluateInterval, switchDistanceDelta
 end
 
+-- Returns whether the monster should stare at the current target instead of chasing.
+local function shouldStareAtTarget(config): boolean
+	local targetingConfig = config.Targeting
+	local stareChance = targetingConfig and targetingConfig.STARE_CHANCE or 0.5
+	return math.random() < stareChance
+end
+
 -- Chooses the preferred target based on current target validity and proximity.
 local function getPreferredTarget(controller, currentTarget: Model?): Model?
 	local config = controller.Config
@@ -218,6 +225,33 @@ local function runWanderStep(controller): Model?
 	return nil
 end
 
+-- Enters stare state and faces the target until it leaves detection range.
+local function stareAtTarget(controller, target: Model)
+	local config = controller.Config
+	controller.StateMachine:SetState(MonsterStateMachine.States.Stare)
+	controller.Movement.SetWalkSpeedTarget(controller, config.MovementSpeeds.STARE)
+	controller.Movement.StepWalkSpeedTransition(controller)
+	controller.Visual.PlayUniqueAnimation(controller, "Stare")
+	controller.Humanoid:MoveTo(controller.RootPart.Position)
+
+	while controller._running and controller.Movement.IsValidTarget(target, controller.Monster) do
+		local targetRoot = getTargetRootPart(target)
+		if not targetRoot then
+			return
+		end
+
+		local distanceToTarget = (controller.RootPart.Position - targetRoot.Position).Magnitude
+		if distanceToTarget > config.Combat.DETECTION_RANGE then
+			return
+		end
+
+		local targetPositionOnPlane =
+			Vector3.new(targetRoot.Position.X, controller.RootPart.Position.Y, targetRoot.Position.Z)
+		controller.RootPart.CFrame = CFrame.lookAt(controller.RootPart.Position, targetPositionOnPlane)
+		task.wait(config.Loop.MAIN_TICK_INTERVAL)
+	end
+end
+
 -- Executes the full melee attack flow against a target, including animation and damage presentation.
 local function performMeleeAttack(controller, target: Model)
 	local config = controller.Config
@@ -358,7 +392,11 @@ local function startControllerLoop(controller)
 			controller.Movement.GetClosestTarget(controller.Monster, controller.RootPart, config.Combat.DETECTION_RANGE)
 
 		if target then
-			chaseTarget(controller, target)
+			if shouldStareAtTarget(config) then
+				stareAtTarget(controller, target)
+			else
+				chaseTarget(controller, target)
+			end
 		else
 			runIdleForDuration(controller, getRandomIdleDuration(config))
 			if not controller._running or controller.Humanoid.Health <= 0 then

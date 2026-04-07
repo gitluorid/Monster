@@ -36,6 +36,8 @@ local Config = {
 		REEVALUATE_INTERVAL = 0.75,
 		-- New candidate must be this much closer before switching chase target.
 		SWITCH_DISTANCE_DELTA = 8,
+		-- Chance to stare instead of chase when a valid target appears.
+		STARE_CHANCE = 0.5,
 	},
 
 	-- Raw walk speeds for each locomotion mode.

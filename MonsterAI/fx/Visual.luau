@@ -80,7 +80,7 @@ local function getAnimationSpeedMapping(controller, animationName: string): (boo
 	return false, 0, 0, 1
 end
 
-local function playAnimation(animationTemplate: Animation, model: Model, fadeInTime: number?): AnimationTrack?
+local function _playAnimation(animationTemplate: Animation, model: Model, fadeInTime: number?): AnimationTrack?
 	if not animationTemplate or not model then
 		return nil
 	end
@@ -191,7 +191,7 @@ function MonsterVisual.PlayUniqueAnimation(controller, animationName: string): A
 		controller._visualCurrentAnimationName = nil
 	end
 
-	controller._visualCurrentAnimationTrack = playAnimation(animation, controller.Monster, fadeInTime)
+	controller._visualCurrentAnimationTrack = _playAnimation(animation, controller.Monster, fadeInTime)
 	controller._visualCurrentAnimationName = animation.Name
 	MonsterVisual.UpdateMovementAnimationSpeed(controller)
 
